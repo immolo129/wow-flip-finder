@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forever Flip Finder</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --panel2: #1e222b; --line: #2a2f3a;
+    --text: #e6e6e6; --muted: #8b93a3; --accent: #c8a24a; --good: #5fbf6a; --bad: #e0625b;
+    --gold: #e9c25a; --silver: #c7ccd6; --copper: #c9814f;
+    --q-common: #ffffff; --q-uncommon: #1eff00; --q-rare: #0070dd; --q-epic: #a335ee; --q-poor: #9d9d9d;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;
+           padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  h1 { margin: 0; font-size: 18px; letter-spacing: .3px; }
+  h1 span { color: var(--accent); }
+  .status { color: var(--muted); font-size: 13px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  .pill { padding: 2px 8px; border-radius: 99px; background: var(--panel2); border: 1px solid var(--line); }
+  .pill.err { color: var(--bad); border-color: var(--bad); }
+  .pill.demo { color: var(--accent); border-color: var(--accent); }
+  button { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 6px;
+           padding: 6px 12px; cursor: pointer; font: inherit; }
+  button:hover { border-color: var(--accent); }
+  main { padding: 16px 20px 40px; max-width: 1500px; margin: 0 auto; }
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 12px; overflow-x: auto; }
+  .tab { padding: 10px 16px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--muted); white-space: nowrap; }
+  .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .tab .count { color: var(--accent); margin-left: 6px; font-size: 12px; }
+  .help { color: var(--muted); margin: 0 0 12px; font-size: 13px; }
+  .filters { display: flex; flex-wrap: wrap; gap: 14px; align-items: end; background: var(--panel); border: 1px solid var(--line);
+             border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+  .filters label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+  .filters input[type=number], .filters input[type=text] { width: 110px; background: var(--panel2); color: var(--text);
+             border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font: inherit; }
+  .filters input[type=text] { width: 180px; }
+  .filters .chk { flex-direction: row; align-items: center; gap: 6px; padding-bottom: 6px; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+  table { width: 100%; border-collapse: collapse; background: var(--panel); }
+  th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+  th { position: sticky; top: 0; background: var(--panel2); color: var(--muted); font-weight: 600; font-size: 12px; cursor: pointer; user-select: none; }
+  th.l, td.l { text-align: left; }
+  th.sorted::after { content: " ▾"; color: var(--accent); }
+  th.sorted.asc::after { content: " ▴"; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: var(--panel2); }
+  tbody tr.open { background: #232835; }
+  .money .g { color: var(--gold); } .money .s { color: var(--silver); } .money .c { color: var(--copper); }
+  .profit { font-weight: 600; }
+  .roi { color: var(--good); }
+  .conf { font-size: 11px; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--line); }
+  .conf.high { color: var(--good); border-color: #2f5e35; } .conf.medium { color: var(--accent); border-color: #5e4f2a; } .conf.low { color: var(--bad); border-color: #5e2f2c; }
+  .route { color: var(--muted); font-size: 12px; }
+  .route.alt { color: var(--bad); }
+  td.muted { color: var(--muted); }
+  .q-common { color: var(--q-common); } .q-uncommon { color: var(--q-uncommon); } .q-rare { color: var(--q-rare); }
+  .q-epic { color: var(--q-epic); } .q-poor { color: var(--q-poor); }
+  a.wh { color: var(--muted); text-decoration: none; margin-left: 6px; font-size: 11px; }
+  a.wh:hover { color: var(--accent); }
+  .copy { margin-left: 6px; padding: 1px 6px; font-size: 11px; }
+  .detail td { background: #13161c; cursor: default; text-align: left; }
+  .detail canvas { width: 100%; height: 180px; display: block; }
+  .legend { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .legend b { font-weight: normal; }
+  .empty { padding: 40px; text-align: center; color: var(--muted); background: var(--panel); }
+  .totals { color: var(--muted); font-size: 13px; margin: 8px 2px; }
+  footer { color: var(--muted); font-size: 12px; margin-top: 18px; }
+  @media (max-width: 700px) { header, main { padding-left: 12px; padding-right: 12px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1><span>⚖</span> Forever Flip Finder</h1>
+  <div class="status" id="status">Loading…</div>
+</header>
+
+<main>
+  <div class="tabs">
+    <button class="tab active" data-kind="reset">Underpriced (reset)<span class="count" id="c-reset"></span></button>
+    <button class="tab" data-kind="arbitrage">Between auction houses<span class="count" id="c-arbitrage"></span></button>
+    <button class="tab" data-kind="vendor">Below vendor price<span class="count" id="c-vendor"></span></button>
+  </div>
+  <p class="help" id="help"></p>
+
+  <div class="filters" id="filters">
+    <label>Search item<input type="text" id="f-search" placeholder="e.g. shard"></label>
+    <label data-for="reset arbitrage vendor">Min profit (gold)<input type="number" id="f-min_profit" step="0.1" min="0"></label>
+    <label data-for="reset arbitrage">Min ROI %<input type="number" id="f-min_roi" step="1" min="0"></label>
+    <label data-for="reset">Buy below % of market<input type="number" id="f-buy_pct" step="1" min="10" max="100"></label>
+    <label data-for="reset arbitrage">Min snapshots seen<input type="number" id="f-min_seen" step="1" min="1"></label>
+    <label data-for="reset arbitrage">Min avg listings<input type="number" id="f-min_listings" step="1" min="0"></label>
+    <label data-for="reset arbitrage" title="Don't buy more than sells in this many days (once sales have been tracked for 12 h)">Days to sell<input type="number" id="f-sell_days" step="0.5" min="0.5"></label>
+    <label class="chk" data-for="arbitrage"><input type="checkbox" id="f-include_alt"> Include routes that need an Alliance alt</label>
+    <label class="chk" data-for="reset arbitrage vendor"><input type="checkbox" id="f-all"> Show all houses</label>
+    <button id="refresh">Reload data</button>
+  </div>
+
+  <div class="totals" id="totals"></div>
+  <div class="tablewrap"><table id="tbl"><thead></thead><tbody></tbody></table></div>
+
+  <footer>
+    Prices per unit. Market = median over the last 7 days of the cheapest-25 % price in each hourly snapshot.
+    Profit is after the AH cut (5 % faction, 15 % Blackwater). Listing deposits are refunded on sale and are not subtracted.
+    Sells/day is an estimate from auctions that vanished between snapshots while they still had hours left (cancelled auctions count too).
+    Snapshots are about an hour old, so cheap listings may already be gone. Click a row for its price history.
+  </footer>
+</main>
+
+<script src="flips.js"></script>
+<script>
+const DEFAULTS = {
+  reset:     { min_profit: 0.5, min_roi: 15, buy_pct: 80, min_seen: 3, min_listings: 2, sell_days: 2 },
+  arbitrage: { min_profit: 0.5, min_roi: 20, min_seen: 3, min_listings: 2, sell_days: 2 },
+  vendor:    { min_profit: 0.01 },
+};
+const HELP = {
+  reset: "Listings far below the item's normal price in the same auction house. Buy them, relist just under the next listing (or at market). Higher confidence = more price history.",
+  arbitrage: "Buy in one auction house and sell in another. Horde and Blackwater (neutral) can both be used by your Horde character, so those routes need no alt.",
+  vendor: "Listings priced below what a vendor pays. Buy and sell to any vendor right away, no risk.",
+};
+const COLS = {
+  reset: [
+    ["name", "Item", "l"], ["house", "House", "l"], ["buy_units", "Units"], ["buy_upto", "Buy up to", "m"],
+    ["cost", "Cost", "m"], ["sell_at", "Sell at", "m"], ["market", "Market", "m"], ["profit", "Profit", "m p"],
+    ["roi", "ROI", "r"], ["sells_day", "Sells/day", "v"], ["confidence", "Data", "conf"],
+  ],
+  arbitrage: [
+    ["name", "Item", "l"], ["buy_house", "Buy in", "l"], ["sell_house", "Sell in", "l"], ["buy_units", "Units"],
+    ["buy_upto", "Buy up to", "m"], ["cost", "Cost", "m"], ["sell_at", "Sell at", "m"], ["profit", "Profit", "m p"],
+    ["roi", "ROI", "r"], ["sells_day", "Sells/day", "v"], ["route", "Route", "route"], ["confidence", "Data", "conf"],
+  ],
+  vendor: [
+    ["name", "Item", "l"], ["house", "House", "l"], ["buy_units", "Units"], ["buy_upto", "Buy up to", "m"],
+    ["cost", "Cost", "m"], ["sell_at", "Vendor pays", "m"], ["profit", "Profit", "m p"], ["roi", "ROI", "r"],
+  ],
+};
+const MAX_ROWS = 500;
+const SHARDS = 64;
+
+let kind = "reset", D = null, rows = [], sortKey = "profit", sortAsc = false, openRow = null;
+const shardCache = new Map();
+const $ = (id) => document.getElementById(id);
+
+function money(c) {
+  c = Math.round(c || 0);
+  const neg = c < 0; c = Math.abs(c);
+  const g = Math.floor(c / 10000), s = Math.floor((c % 10000) / 100), cu = c % 100;
+  let out = "";
+  if (g) out += `<span class="g">${g.toLocaleString("en")}g</span> `;
+  if (g || s) out += `<span class="s">${s}s</span> `;
+  if (!g) out += `<span class="c">${cu}c</span>`;
+  return `<span class="money">${neg ? "-" : ""}${out.trim()}</span>`;
+}
+const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+const ago = (ts) => { const m = Math.round((Date.now() / 1000 - ts) / 60); return m < 60 ? `${m} min ago` : `${Math.round(m / 6) / 10} h ago`; };
+
+// ---------- filters ----------
+function savedFilters(k) {
+  try { return JSON.parse(localStorage.getItem("ff-" + k) || "{}"); } catch (e) { return {}; }
+}
+function loadFilters() {
+  const f = { ...DEFAULTS[kind], ...savedFilters(kind) };
+  for (const k of ["min_profit", "min_roi", "buy_pct", "min_seen", "min_listings", "sell_days"]) if (f[k] !== undefined) $("f-" + k).value = f[k];
+  $("f-include_alt").checked = !!f.include_alt;
+  $("f-all").checked = !!f.all;
+  document.querySelectorAll("#filters [data-for]").forEach((el) => {
+    el.style.display = el.dataset.for.split(" ").includes(kind) ? "" : "none";
+  });
+}
+function readFilters() {
+  const f = {};
+  for (const k of Object.keys(DEFAULTS[kind])) f[k] = $("f-" + k).value;
+  if (kind === "arbitrage") f.include_alt = $("f-include_alt").checked;
+  f.all = $("f-all").checked;
+  try { localStorage.setItem("ff-" + kind, JSON.stringify(f)); } catch (e) {}
+  return f;
+}
+// form values (gold, percent) -> what flips.js expects (copper, fractions)
+function toCalc(k, f) {
+  const d = DEFAULTS[k], num = (key) => { const v = parseFloat(f[key]); return isNaN(v) ? d[key] : v; };
+  return {
+    min_profit: Math.round(num("min_profit") * 10000),
+    min_roi: (num("min_roi") || 0) / 100, buy_pct: (num("buy_pct") || 80) / 100,
+    min_seen: num("min_seen") || 1, min_listings: num("min_listings") || 0, sell_days: num("sell_days") || 0,
+    include_alt: !!f.include_alt,
+  };
+}
+const factionFor = (f) => (f.all ? null : D.status.faction);
+const compute = (k, f) => FLIPS[k](D, toCalc(k, f), factionFor(f));
+
+// ---------- data ----------
+async function loadData() {
+  try {
+    const r = await fetch("data/latest.json", { cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    D = prepare(await r.json());
+  } catch (e) {
+    $("status").innerHTML = `<span class="pill err">Couldn't load data: ${esc(e.message)}</span>`;
+    return;
+  }
+  shardCache.clear();
+  renderStatus();
+  recompute();
+}
+
+function recompute() {
+  if (!D) return;
+  rows = compute(kind, readFilters());
+  $("c-" + kind).textContent = rows.length;
+  for (const k of Object.keys(DEFAULTS)) if (k !== kind) $("c-" + k).textContent = compute(k, { ...DEFAULTS[k], ...savedFilters(k) }).length;
+  openRow = null;
+  render();
+}
+
+function render() {
+  const cols = COLS[kind];
+  const q = $("f-search").value.trim().toLowerCase();
+  let list = rows.filter((r) => !q || r.name.toLowerCase().includes(q));
+  list.sort((a, b) => {
+    const x = a[sortKey], y = b[sortKey];
+    const c = typeof x === "string" ? x.localeCompare(y) : (x ?? -1) - (y ?? -1);
+    return sortAsc ? c : -c;
+  });
+  const total = list.length;
+  list = list.slice(0, MAX_ROWS);
+
+  $("tbl").querySelector("thead").innerHTML = "<tr>" + cols.map(([k, label, t]) =>
+    `<th data-k="${k}" class="${(t || "").includes("l") || t === "route" || t === "conf" ? "l" : ""} ${sortKey === k ? "sorted" + (sortAsc ? " asc" : "") : ""}">${label}</th>`).join("") + "</tr>";
+
+  const tb = $("tbl").querySelector("tbody");
+  if (!list.length) {
+    const s = D && D.status.snapshots;
+    const msg = !s || !s.n ? "No data yet. The first collection takes a minute or two."
+      : (s.n < 3 && kind !== "vendor") ? `Only ${s.n} snapshot(s) so far. Flips need at least ${$("f-min_seen").value || 3} hours of history (or lower "Min snapshots seen").`
+      : "No flips match these filters right now.";
+    tb.innerHTML = `<tr><td class="empty" colspan="${cols.length}">${msg}</td></tr>`;
+    $("totals").textContent = "";
+    return;
+  }
+
+  tb.innerHTML = list.map((r, i) => "<tr data-i='" + i + "'>" + cols.map(([k, , t]) => {
+    const v = r[k];
+    if (k === "name") return `<td class="l"><span class="q-${esc(r.quality || "common")}">${esc(v)}</span>` +
+      `<button class="copy" data-copy="${esc(v)}" title="Copy name for the AH search box">copy</button>` +
+      `<a class="wh" href="https://www.wowhead.com/classic/item=${r.item_id}" target="_blank" rel="noopener">wowhead</a></td>`;
+    if ((t || "").startsWith("m")) return `<td class="${t.includes("p") ? "profit" : ""}">${money(v)}</td>`;
+    if (t === "r") return `<td class="roi">${Math.round(v * 100)}%</td>`;
+    if (t === "v") return v == null ? `<td class="muted" title="Not enough sales tracking yet (needs 12 h)">–</td>`
+      : `<td title="Estimated: auctions that disappeared while they still had hours left">${v.toLocaleString("en")}</td>`;
+    if (t === "conf") return `<td class="l"><span class="conf ${v}" title="${r.seen} snapshots">${v}</span></td>`;
+    if (t === "route") return `<td class="l route ${v.startsWith("Needs") ? "alt" : ""}">${esc(v)}</td>`;
+    if (t === "l") return `<td class="l">${esc(v).replace(" Auction House", "")}</td>`;
+    return `<td>${typeof v === "number" ? v.toLocaleString("en") : esc(v)}</td>`;
+  }).join("") + "</tr>").join("");
+  tb._list = list;
+
+  const tp = list.reduce((a, r) => a + r.profit, 0), tc = list.reduce((a, r) => a + r.cost, 0);
+  $("totals").innerHTML = `${total} flips${total > MAX_ROWS ? ` (showing the top ${MAX_ROWS})` : ""} · total cost ${money(tc)} · total potential profit ${money(tp)}`;
+}
+
+// ---------- price history ----------
+async function history(houseId, itemId) {
+  const k = itemId % SHARDS;
+  if (!shardCache.has(k)) shardCache.set(k, fetch(`data/history/${k}.json`, { cache: "no-store" }).then((r) => r.ok ? r.json() : {}).catch(() => ({})));
+  const series = (await shardCache.get(k))[houseId + ":" + itemId] || [];
+  return series.map(([ts, min_price, market]) => ({ ts, min_price, market }));
+}
+
+async function toggleDetail(tr) {
+  const tb = tr.parentElement;
+  tb.querySelectorAll("tr.detail").forEach((d) => d.remove());
+  tb.querySelectorAll("tr.open").forEach((o) => o.classList.remove("open"));
+  const r = tb._list[+tr.dataset.i];
+  if (openRow === r) { openRow = null; return; }
+  openRow = r;
+  tr.classList.add("open");
+  const house = r.house || r.sell_house;
+  const d = document.createElement("tr");
+  d.className = "detail";
+  d.innerHTML = `<td colspan="${COLS[kind].length}"><canvas></canvas><div class="legend">${esc(r.name)} in ${esc(house)}:
+    <b style="color:var(--accent)">— market (cheapest 25 %)</b> &nbsp; <b style="color:#6aa6ff">— lowest listing</b>
+    ${r.buy_house ? ` · buying in ${esc(r.buy_house)}` : ""}</div></td>`;
+  tr.after(d);
+  drawChart(d.querySelector("canvas"), await history(r.house_id, r.item_id));
+}
+
+function drawChart(cv, hist) {
+  const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+  cv.width = w * dpr; cv.height = h * dpr;
+  const ctx = cv.getContext("2d"); ctx.scale(dpr, dpr);
+  if (hist.length < 2) { ctx.fillStyle = "#8b93a3"; ctx.fillText("Not enough history yet", 10, 20); return; }
+  const pad = { l: 70, r: 10, t: 10, b: 22 };
+  const xs = hist.map((p) => p.ts), all = hist.flatMap((p) => [p.market, p.min_price]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...all) * 0.95, y1 = Math.max(...all) * 1.05;
+  const X = (t) => pad.l + (t - x0) / (x1 - x0 || 1) * (w - pad.l - pad.r);
+  const Y = (v) => h - pad.b - (v - y0) / (y1 - y0 || 1) * (h - pad.t - pad.b);
+  ctx.strokeStyle = "#2a2f3a"; ctx.fillStyle = "#8b93a3"; ctx.font = "11px system-ui"; ctx.lineWidth = 1;
+  for (let i = 0; i <= 3; i++) {
+    const v = y0 + (y1 - y0) * i / 3, y = Y(v);
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke();
+    const g = v / 10000; ctx.fillText(g >= 1 ? g.toFixed(g < 10 ? 2 : 1) + "g" : (v / 100).toFixed(1) + "s", 6, y + 4);
+  }
+  [0, 1].forEach((f) => {
+    const t = x0 + (x1 - x0) * f, d = new Date(t * 1000);
+    const label = d.toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+    ctx.fillText(label, f ? w - pad.r - ctx.measureText(label).width : pad.l, h - 6);
+  });
+  const line = (key, color) => {
+    ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.beginPath();
+    hist.forEach((p, i) => (i ? ctx.lineTo : ctx.moveTo).call(ctx, X(p.ts), Y(p[key]))); ctx.stroke();
+  };
+  line("min_price", "#6aa6ff"); line("market", "#c8a24a");
+}
+
+// ---------- status ----------
+function renderStatus() {
+  const s = D.status, parts = [];
+  if (s.demo) parts.push('<span class="pill demo">DEMO DATA</span>');
+  parts.push(`<span class="pill">${esc(s.region)} · ${esc(s.ruleset_name)} · ${esc(s.faction[0].toUpperCase() + s.faction.slice(1))}</span>`);
+  if (s.snapshots && s.snapshots.n) parts.push(`${s.snapshots.n} h of history · data from ${ago(s.snapshots.last)}`);
+  if (s.running) parts.push("collecting…");
+  else if (s.live && s.next_run) parts.push(`next fetch in ${Math.max(0, Math.round((s.next_run - Date.now() / 1000) / 60))} min`);
+  else if (!s.live && !s.demo) parts.push("updates hourly");
+  if (s.last_error) parts.push(`<span class="pill err" title="${esc(s.last_error)}">last fetch failed</span>`);
+  if (s.live) parts.push('<button id="fetchnow">Fetch now</button>');
+  $("status").innerHTML = parts.join(" ");
+  const b = $("fetchnow");
+  if (b) b.onclick = async () => {
+    b.disabled = true; b.textContent = "Fetching…";
+    await fetch("api/collect", { method: "POST" });
+    const poll = setInterval(async () => {
+      const r = await (await fetch("api/status")).json();
+      if (!r.running) { clearInterval(poll); loadData(); }
+    }, 5000);
+  };
+}
+
+// ---------- events ----------
+document.querySelectorAll(".tab").forEach((t) => t.onclick = () => {
+  document.querySelectorAll(".tab").forEach((x) => x.classList.remove("active"));
+  t.classList.add("active"); kind = t.dataset.kind; $("help").textContent = HELP[kind];
+  sortKey = "profit"; sortAsc = false; loadFilters(); recompute();
+});
+$("refresh").onclick = loadData;
+$("filters").addEventListener("change", (e) => { if (e.target.id !== "f-search") recompute(); });
+$("f-search").addEventListener("input", render);
+$("tbl").addEventListener("click", (e) => {
+  const cp = e.target.closest("[data-copy]");
+  if (cp) { e.stopPropagation(); navigator.clipboard && navigator.clipboard.writeText(cp.dataset.copy); cp.textContent = "copied"; setTimeout(() => cp.textContent = "copy", 1000); return; }
+  if (e.target.closest("a")) return;
+  const th = e.target.closest("th");
+  if (th) { const k = th.dataset.k; if (sortKey === k) sortAsc = !sortAsc; else { sortKey = k; sortAsc = false; } render(); return; }
+  const tr = e.target.closest("tbody tr[data-i]");
+  if (tr) toggleDetail(tr);
+});
+
+$("help").textContent = HELP[kind];
+loadFilters();
+loadData();
+setInterval(loadData, 10 * 60000);   // new data arrives about once an hour
+</script>
+</body>
+</html>

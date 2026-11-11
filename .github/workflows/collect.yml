@@ -1,0 +1,88 @@
+# Every hour: fetch Blizzard's auction data, update the price history and publish the page.
+#
+# The price history (flips.db) is kept as a file on a release called "data" in this repo,
+# so the repo itself doesn't grow. Don't delete that release, or the history starts over.
+
+name: Collect auction data
+
+on:
+  schedule:
+    - cron: "17 * * * *"   # every hour at :17 (the top of the hour is GitHub's busiest time)
+  workflow_dispatch:        # "Run workflow" button in the Actions tab
+
+permissions:
+  contents: write   # store the database on the release, and the keep-alive commit
+  pages: write      # publish the page
+  id-token: write   # needed by deploy-pages
+
+concurrency:
+  group: collect
+  cancel-in-progress: false   # never let two runs write the database at the same time
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BLIZZARD_CLIENT_ID: ${{ secrets.BLIZZARD_CLIENT_ID }}
+      BLIZZARD_CLIENT_SECRET: ${{ secrets.BLIZZARD_CLIENT_SECRET }}
+      REGION: ${{ vars.REGION || 'eu' }}
+      RULESET: ${{ vars.RULESET || '1' }}
+      FACTION: ${{ vars.FACTION || 'horde' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - run: pip install requests
+
+      - name: Download the price history
+        run: |
+          if ! gh release view data >/dev/null 2>&1; then
+            echo "First run: creating the 'data' release that stores the database"
+            gh release create data --title "Price history" --latest=false \
+              --notes "Database used by the hourly job. Don't delete this release, or the price history starts over."
+          elif gh release view data --json assets -q '.assets[].name' | grep -qx flips.db.gz; then
+            gh release download data -p flips.db.gz
+            gunzip flips.db.gz
+          fi
+
+      - name: Fetch auctions and build the page
+        id: collect
+        run: python cloud.py --db flips.db --out site
+
+      - name: Save the price history
+        run: |
+          gzip -9 flips.db
+          gh release upload data flips.db.gz --clobber
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+      # GitHub switches off scheduled jobs in repos with no commits for 60 days.
+      - name: Keep the hourly schedule alive
+        run: |
+          if [ $(( $(date +%s) - $(git log -1 --format=%ct) )) -gt $(( 45 * 86400 )) ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit --allow-empty -m "Keep the hourly schedule alive"
+            git push
+          fi
+
+      - name: Report a failed fetch
+        if: steps.collect.outputs.failed == 'true'
+        run: |
+          echo "Blizzard fetch failed; the page was still published and shows the error."
+          exit 1
