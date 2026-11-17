@@ -87,7 +87,7 @@ def latest(db, cfg, extra=None):
 
 
 def _history_rows(db, ruleset, shard=None, days=HISTORY_DAYS):
-    sql = """SELECT s.house_id, st.item_id, s.ts, st.min_price, st.market
+    sql = """SELECT s.house_id, st.item_id, s.ts, st.min_price, st.market, st.quantity
              FROM item_stats st JOIN snapshots s ON s.id = st.snapshot_id
              WHERE s.ruleset=? AND s.ts>=?"""
     params = [ruleset, int(time.time()) - days * 86400]
@@ -98,11 +98,11 @@ def _history_rows(db, ruleset, shard=None, days=HISTORY_DAYS):
 
 
 def _group(rows):
-    """-> {shard: {"house:item": [[ts, min_price, market], ...]}}"""
+    """-> {shard: {"house:item": [[ts, min_price, market, quantity], ...]}}"""
     out = defaultdict(dict)
     for r in rows:
         out[r["item_id"] % SHARDS].setdefault(f"{r['house_id']}:{r['item_id']}", []).append(
-            [r["ts"], r["min_price"], r["market"]])
+            [r["ts"], r["min_price"], r["market"], r["quantity"]])
     return out
 
 

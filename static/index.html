@@ -150,8 +150,33 @@
   td.muted { color: var(--dim); }
   .q-common { color: var(--q-common); } .q-uncommon { color: var(--q-uncommon); } .q-rare { color: var(--q-rare); }
   .q-epic { color: var(--q-epic); } .q-poor { color: var(--q-poor); }
-  .detail td { background: #0f0f12; cursor: default; text-align: left; padding: 16px 20px; }
-  .detail canvas { width: 100%; height: 200px; display: block; }
+  /* ---------- item panel ---------- */
+  #drawer { display: none; position: fixed; inset: 0; z-index: 40; }
+  body.drawer #drawer { display: block; }
+  body.drawer { overflow: hidden; }
+  #drawer .back { position: absolute; inset: 0; background: rgba(0, 0, 0, .6); }
+  .dpanel { position: absolute; top: 0; right: 0; bottom: 0; width: min(780px, 100%); overflow-y: auto; padding: 22px 24px 28px;
+            background: var(--panel); border-left: 1px solid var(--line2); box-shadow: -24px 0 60px rgba(0, 0, 0, .5); }
+  .dhead { display: flex; align-items: center; gap: 14px; }
+  .dhead .ico { width: 48px; height: 48px; border-radius: 10px; font-size: 18px; }
+  .dhead .nm { font: 700 21px/1.25 var(--head); }
+  .dhead .links { display: flex; gap: 6px; margin-top: 6px; }
+  .dhead .x { margin-left: auto; align-self: flex-start; padding: 6px 11px; }
+  .dflip { margin-top: 16px; padding: 12px 14px; border-radius: 10px; background: var(--accent-soft); border: 1px solid rgba(242, 184, 29, .25); line-height: 1.7; }
+  .dstats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+  .dstats div { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .dstats > div > span { display: block; color: var(--muted); font-size: 12px; }
+  .dstats b { display: block; font: 600 16px/1.4 var(--head); margin-top: 2px; }
+  .dstats small { color: var(--dim); font: 400 11px var(--body); }
+  .dctl { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 20px 0 10px; }
+  .chartbox { position: relative; }
+  #pc { width: 100%; height: 280px; display: block; cursor: crosshair; }
+  #qc { width: 100%; height: 70px; display: block; margin-top: 6px; cursor: crosshair; }
+  #tip { display: none; position: absolute; pointer-events: none; background: #0b0b0e; border: 1px solid var(--line2); border-radius: 9px;
+         padding: 8px 11px; font-size: 12px; white-space: nowrap; box-shadow: 0 8px 24px rgba(0, 0, 0, .5); }
+  #tip .when { color: var(--muted); margin-bottom: 4px; }
+  #tip i, .legend i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+  @media (max-width: 600px) { .dpanel { padding: 16px; } .dstats { grid-template-columns: repeat(2, minmax(0, 1fr)); } #pc { height: 220px; } }
   .legend { color: var(--muted); font-size: 12px; margin-top: 8px; display: flex; gap: 16px; flex-wrap: wrap; }
   .legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
   .empty { padding: 48px 20px; text-align: center; color: var(--muted); }
@@ -335,7 +360,7 @@
             <label class="chk" data-for="arbitrage"><input type="checkbox" id="f-include_alt"> Include routes that need an alt on the other faction</label>
             <button class="btn" id="resetfilters" type="button">Reset to defaults</button>
           </div>
-          <div class="tablebar"><span id="totals"></span><span class="grow"></span><span>Click a row for its price history</span></div>
+          <div class="tablebar"><span id="totals"></span><span class="grow"></span><span>Click an item to see its charts</span></div>
           <div class="tablewrap"><table id="tbl"><thead></thead><tbody></tbody></table></div>
         </div>
       </section>
@@ -346,6 +371,25 @@
         Sells/day is an estimate from auctions that vanished between snapshots while they still had hours left (cancelled auctions count too).
       </footer>
     </div>
+  </div>
+</div>
+
+<div id="drawer" aria-modal="true" role="dialog">
+  <div class="back"></div>
+  <div class="dpanel">
+    <div class="dhead" id="dhead"></div>
+    <div class="dflip" id="dflip" hidden></div>
+    <div class="dstats" id="dstats"></div>
+    <div class="dctl">
+      <div class="seg" id="dhouses" title="Auction house"></div>
+      <div class="seg" id="drange" title="Time range"></div>
+    </div>
+    <div class="chartbox">
+      <canvas id="pc"></canvas>
+      <div id="tip"></div>
+    </div>
+    <canvas id="qc"></canvas>
+    <div class="legend"><span><i style="background:var(--blue)"></i>Lowest listing</span><span><i style="background:var(--accent)"></i>Market value (cheapest 25 %)</span><span><i style="background:#8e8e99"></i>Units listed</span></div>
   </div>
 </div>
 
@@ -384,7 +428,7 @@ const KINDS = ["reset", "arbitrage", "vendor"];
 const MAX_ROWS = 500;
 const SHARDS = 64;
 
-let page = "overview", kind = "reset", D = null, rows = [], all = {}, sortKey = "profit", sortAsc = false, openRow = null;
+let page = "overview", kind = "reset", D = null, rows = [], all = {}, sortKey = "profit", sortAsc = false;
 const shardCache = new Map();
 const $ = (id) => document.getElementById(id);
 
@@ -529,7 +573,7 @@ function refresh() {
   }
   renderChrome();
   if (page === "overview") renderOverview();
-  else { rows = compute(kind, readFilters()); all[kind] = rows; $("n-" + kind).textContent = rows.length || ""; openRow = null; renderPage(); }
+  else { rows = compute(kind, readFilters()); all[kind] = rows; $("n-" + kind).textContent = rows.length || ""; renderPage(); }
 }
 
 // ---------- chrome: top bar, sidebar footer ----------
@@ -698,56 +742,162 @@ async function loadHistory(houseId, itemId) {
   if (!shardCache.has(k)) shardCache.set(k, fetch(`data/history/${k}.json`, { cache: "no-store" })
     .then((r) => r.ok ? r.json() : {}).then(unlock).catch(() => ({})));
   const series = (await shardCache.get(k))[houseId + ":" + itemId] || [];
-  return series.map(([ts, min_price, market]) => ({ ts, min_price, market }));
+  return series.map(([ts, min_price, market, quantity]) => ({ ts, min_price, market, quantity }));
 }
 
-async function toggleDetail(tr) {
-  const tb = tr.parentElement;
-  tb.querySelectorAll("tr.detail").forEach((d) => d.remove());
-  tb.querySelectorAll("tr.open").forEach((o) => o.classList.remove("open"));
-  const r = tb._list[+tr.dataset.i];
-  if (openRow === r) { openRow = null; return; }
-  openRow = r;
-  tr.classList.add("open");
-  const house = r.house || r.sell_house;
-  const d = document.createElement("tr");
-  d.className = "detail";
-  d.innerHTML = `<td colspan="${COLS[kind].length}"><canvas></canvas><div class="legend"><span>${esc(r.name)} in ${esc(short(house))}</span>
-    <span><i style="background:var(--accent)"></i>Market (cheapest 25 %)</span><span><i style="background:var(--blue)"></i>Lowest listing</span>
-    ${r.buy_house ? `<span>Buying in ${esc(short(r.buy_house))}</span>` : ""}</div></td>`;
-  tr.after(d);
-  drawChart(d.querySelector("canvas"), await loadHistory(r.house_id, r.item_id));
+// ---------- item panel ----------
+let IV = null;   // { r: the flip row, house, range (days), hist, view (filtered hist), hover, px }
+const RANGES = [[1, "24h"], [3, "3 days"], [7, "7 days"]];
+const goldLabel = (v) => {
+  const g = v / 10000;
+  return g >= 1 ? (g >= 100 ? Math.round(g).toLocaleString("en") : g.toFixed(g < 10 ? 2 : 1)) + "g" : v >= 100 ? (v / 100).toFixed(1) + "s" : Math.round(v) + "c";
+};
+const when = (ts) => new Date(ts * 1000).toLocaleString("en-GB", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+
+function itemHouses(itemId) {
+  return [...D.houses.values()].filter((h) => D.ladders.has(h.id + ":" + itemId) || D.markets.has(h.id + ":" + itemId));
 }
 
-function drawChart(cv, hist) {
-  const css = getComputedStyle(document.documentElement), col = (v) => css.getPropertyValue(v).trim();
+function openItem(r) {
+  IV = { r, house: r.house_id, range: (IV && IV.range) || 3, hist: [], view: [], hover: null };
+  document.body.classList.add("drawer");
+  renderItem();
+}
+function closeItem() { document.body.classList.remove("drawer"); IV = null; }
+
+async function renderItem() {
+  const r = IV.r, q = esc(r.quality || "common");
+  const houses = itemHouses(r.item_id);
+  if (!houses.some((h) => h.id === IV.house) && houses[0]) IV.house = houses[0].id;
+  const key = IV.house + ":" + r.item_id, lad = D.ladders.get(key) || [], m = D.markets.get(key);
+  const units = lad.reduce((a, [, n]) => a + n, 0), vendor = itemOf(D, r.item_id).vendor, spd = m ? sellsDay(m) : null;
+
+  $("dhead").innerHTML = `${itemIcon(r, q)}<div class="t"><div class="nm q-${q}">${esc(r.name)}</div>` +
+    `<div class="links"><button class="mini" data-copy="${esc(r.name)}">copy</button>` +
+    `<a class="mini" href="https://www.wowhead.com/classic/item=${r.item_id}" target="_blank" rel="noopener">wowhead</a></div></div>` +
+    `<button class="btn x" id="dclose" aria-label="Close">✕</button>`;
+  $("dstats").innerHTML = [
+    ["Lowest price now", lad.length ? money(lad[0][0]) : "–"],
+    ["Market value", m ? money(m.market) : "–"],
+    ["Vendor pays", vendor ? money(vendor) : "–"],
+    ["Units listed", units.toLocaleString("en") + ` <small>${lad.reduce((a, l) => a + l[2], 0)} auctions</small>`],
+    ["Sells per day", spd == null ? `<span style="color:var(--dim)">tracking…</span>` : round1(spd).toLocaleString("en")],
+    ["History", m ? `${m.seen} snapshots` : "–"],
+  ].map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join("");
+
+  const fl = r.kind ? `<span class="tag ${r.kind}">${esc(PAGES[r.kind].tag)}</span> ` +
+    (r.kind === "arbitrage" ? `Buy <b>${r.buy_units}</b> in ${esc(short(r.buy_house))} up to ${money(r.buy_upto)}, sell in ${esc(short(r.sell_house))} at ${money(r.sell_at)}`
+      : r.kind === "vendor" ? `Buy <b>${r.buy_units}</b> up to ${money(r.buy_upto)} and sell to a vendor for ${money(r.sell_at)}`
+      : `Buy <b>${r.buy_units}</b> up to ${money(r.buy_upto)}, relist at ${money(r.sell_at)}`) +
+    ` → profit <b class="profit">${money(r.profit)}</b> <span class="roi">(${Math.round(r.roi * 100)}%)</span>` : "";
+  $("dflip").innerHTML = fl;
+  $("dflip").hidden = !fl;
+
+  $("dhouses").innerHTML = houses.map((h) => `<button data-h="${h.id}" class="${h.id === IV.house ? "on" : ""}">${esc(short(h.name))}</button>`).join("");
+  $("drange").innerHTML = RANGES.map(([d, l]) => `<button data-r="${d}" class="${d === IV.range ? "on" : ""}">${l}</button>`).join("");
+  $("dclose").onclick = closeItem;
+
+  const want = IV.r, wantHouse = IV.house;
+  const hist = await loadHistory(IV.house, r.item_id);
+  if (!IV || IV.r !== want || IV.house !== wantHouse) return;   // closed or switched meanwhile
+  IV.hist = hist; IV.hover = null;
+  drawItem();
+}
+
+function drawItem() {
+  if (!IV) return;
+  const last = IV.hist.length ? IV.hist[IV.hist.length - 1].ts : 0;
+  IV.view = IV.hist.filter((p) => p.ts >= last - IV.range * 86400);
+  drawPrice($("pc"), IV.view, IV.hover);
+  drawQty($("qc"), IV.view, IV.hover);
+  const tip = $("tip"), p = IV.hover != null && IV.view[IV.hover];
+  if (!p) { tip.style.display = "none"; return; }
+  tip.innerHTML = `<div class="when">${when(p.ts)}</div><div><i style="background:var(--blue)"></i>Lowest <b>${money(p.min_price)}</b></div>` +
+    `<div><i style="background:var(--accent)"></i>Market <b>${money(p.market)}</b></div><div><i style="background:#8e8e99"></i>Listed <b>${(p.quantity ?? 0).toLocaleString("en")}</b></div>`;
+  tip.style.display = "block";
+  const width = $("pc").clientWidth;
+  tip.style.left = (IV.px + 14 + tip.offsetWidth > width ? IV.px - 14 - tip.offsetWidth : IV.px + 14) + "px";
+  tip.style.top = "8px";
+}
+
+const PAD = { l: 64, r: 12, t: 12, b: 26 };
+function setupCanvas(cv) {
   const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
   cv.width = w * dpr; cv.height = h * dpr;
   const ctx = cv.getContext("2d"); ctx.scale(dpr, dpr);
-  ctx.font = "12px Inter, system-ui"; ctx.fillStyle = col("--muted");
-  if (hist.length < 2) { ctx.fillText("Not enough history yet", 10, 20); return; }
-  const pad = { l: 70, r: 10, t: 10, b: 24 };
-  const xs = hist.map((p) => p.ts), allv = hist.flatMap((p) => [p.market, p.min_price]);
-  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...allv) * 0.95, y1 = Math.max(...allv) * 1.05;
-  const X = (t) => pad.l + (t - x0) / (x1 - x0 || 1) * (w - pad.l - pad.r);
-  const Y = (v) => h - pad.b - (v - y0) / (y1 - y0 || 1) * (h - pad.t - pad.b);
-  ctx.strokeStyle = col("--line"); ctx.lineWidth = 1;
-  for (let i = 0; i <= 3; i++) {
-    const v = y0 + (y1 - y0) * i / 3, y = Y(v);
-    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke();
-    const g = v / 10000; ctx.fillText(g >= 1 ? g.toFixed(g < 10 ? 2 : 1) + "g" : (v / 100).toFixed(1) + "s", 6, y + 4);
-  }
-  [0, 1].forEach((f) => {
-    const t = x0 + (x1 - x0) * f, d = new Date(t * 1000);
-    const label = d.toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
-    ctx.fillText(label, f ? w - pad.r - ctx.measureText(label).width : pad.l, h - 6);
-  });
-  const line = (key, color) => {
-    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath();
-    hist.forEach((p, i) => (i ? ctx.lineTo : ctx.moveTo).call(ctx, X(p.ts), Y(p[key]))); ctx.stroke();
-  };
-  line("min_price", col("--blue")); line("market", col("--accent"));
+  return { ctx, w, h };
 }
+const cssv = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const xOf = (view, w) => {
+  const x0 = view[0].ts, x1 = view[view.length - 1].ts;
+  return (t) => PAD.l + (t - x0) / (x1 - x0 || 1) * (w - PAD.l - PAD.r);
+};
+
+function drawPrice(cv, view, hover) {
+  const { ctx, w, h } = setupCanvas(cv);
+  ctx.font = "12px Inter, system-ui"; ctx.fillStyle = cssv("--muted");
+  if (view.length < 2) { ctx.fillText("Not enough history yet. The chart fills in as hourly snapshots come in.", 12, 24); return; }
+  const allv = view.flatMap((p) => [p.market, p.min_price]);
+  const y0 = Math.min(...allv) * 0.95, y1 = Math.max(...allv) * 1.05;
+  const X = xOf(view, w), Y = (v) => h - PAD.b - (v - y0) / (y1 - y0 || 1) * (h - PAD.t - PAD.b);
+  ctx.strokeStyle = cssv("--line"); ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const v = y0 + (y1 - y0) * i / 4, y = Y(v);
+    ctx.beginPath(); ctx.moveTo(PAD.l, y); ctx.lineTo(w - PAD.r, y); ctx.stroke();
+    ctx.fillText(goldLabel(v), 8, y + 4);
+  }
+  // date ticks: one per day, or every 6 hours on the 24h view
+  const step = IV.range <= 1 ? 6 * 3600 : 86400;
+  for (let t = Math.ceil(view[0].ts / step) * step; t <= view[view.length - 1].ts; t += step) {
+    const d = new Date(t * 1000);
+    const label = step < 86400 ? d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+    const x = X(t), lw = ctx.measureText(label).width;
+    if (x - lw / 2 > PAD.l - 10 && x + lw / 2 < w) ctx.fillText(label, x - lw / 2, h - 6);
+  }
+  // shaded area under the market line
+  const g = ctx.createLinearGradient(0, PAD.t, 0, h - PAD.b);
+  g.addColorStop(0, "rgba(242,184,29,.18)"); g.addColorStop(1, "rgba(242,184,29,0)");
+  ctx.beginPath(); view.forEach((p, i) => (i ? ctx.lineTo : ctx.moveTo).call(ctx, X(p.ts), Y(p.market)));
+  ctx.lineTo(X(view[view.length - 1].ts), h - PAD.b); ctx.lineTo(X(view[0].ts), h - PAD.b); ctx.closePath();
+  ctx.fillStyle = g; ctx.fill();
+  const line = (key, color) => {
+    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineJoin = "round"; ctx.beginPath();
+    view.forEach((p, i) => (i ? ctx.lineTo : ctx.moveTo).call(ctx, X(p.ts), Y(p[key]))); ctx.stroke();
+  };
+  line("min_price", cssv("--blue")); line("market", cssv("--accent"));
+  if (hover != null && view[hover]) {
+    const p = view[hover], x = X(p.ts);
+    ctx.strokeStyle = cssv("--dim"); ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(x, PAD.t); ctx.lineTo(x, h - PAD.b); ctx.stroke(); ctx.setLineDash([]);
+    [["min_price", "--blue"], ["market", "--accent"]].forEach(([k, c]) => {
+      ctx.fillStyle = cssv(c); ctx.beginPath(); ctx.arc(x, Y(p[k]), 4, 0, 7); ctx.fill();
+    });
+  }
+}
+
+function drawQty(cv, view, hover) {
+  const { ctx, w, h } = setupCanvas(cv);
+  if (view.length < 2) return;
+  const qmax = Math.max(1, ...view.map((p) => p.quantity || 0));
+  const X = xOf(view, w), bw = Math.max(2, (w - PAD.l - PAD.r) / view.length - 2);
+  ctx.font = "11px Inter, system-ui"; ctx.fillStyle = cssv("--muted");
+  ctx.fillText(qmax.toLocaleString("en"), 8, 14); ctx.fillText("listed", 8, 28);
+  view.forEach((p, i) => {
+    const bh = (p.quantity || 0) / qmax * (h - 8);
+    ctx.fillStyle = i === hover ? cssv("--accent") : "rgba(142,142,153,.35)";
+    ctx.fillRect(X(p.ts) - bw / 2, h - bh, bw, bh);
+  });
+}
+
+function hoverAt(e) {
+  if (!IV || IV.view.length < 2) return;
+  const box = e.currentTarget.getBoundingClientRect(), x = e.clientX - box.left;
+  const X = xOf(IV.view, box.width);
+  let best = 0;
+  IV.view.forEach((p, i) => { if (Math.abs(X(p.ts) - x) < Math.abs(X(IV.view[best].ts) - x)) best = i; });
+  IV.hover = best; IV.px = X(IV.view[best].ts);
+  drawItem();
+}
+function hoverOut() { if (IV) { IV.hover = null; drawItem(); } }
 
 // ---------- navigation ----------
 function showPage(p) {
@@ -796,12 +946,21 @@ document.addEventListener("click", (e) => {
   if (cp) { e.stopPropagation(); navigator.clipboard && navigator.clipboard.writeText(cp.dataset.copy); cp.textContent = "copied"; setTimeout(() => cp.textContent = "copy", 1000); return; }
   if (e.target.closest("a")) return;
   const top = e.target.closest("#toptbl tr[data-top]");
-  if (top) { const r = $("toptbl").querySelector("tbody")._list[+top.dataset.top]; $("search").value = r.name; location.hash = "#" + r.kind; return; }
+  if (top) { openItem($("toptbl").querySelector("tbody")._list[+top.dataset.top]); return; }
   const th = e.target.closest("#tbl th");
   if (th) { const k = th.dataset.k; if (sortKey === k) sortAsc = !sortAsc; else { sortKey = k; sortAsc = false; } renderPage(); return; }
   const tr = e.target.closest("#tbl tbody tr[data-i]");
-  if (tr) toggleDetail(tr);
+  if (tr) { openItem($("tbl").querySelector("tbody")._list[+tr.dataset.i]); return; }
+  // item panel controls
+  const hb = e.target.closest("#dhouses button[data-h]");
+  if (hb && IV) { IV.house = +hb.dataset.h; renderItem(); return; }
+  const rb = e.target.closest("#drange button[data-r]");
+  if (rb && IV) { IV.range = +rb.dataset.r; IV.hover = null; $("drange").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b === rb)); drawItem(); return; }
+  if (e.target.closest("#drawer .back")) closeItem();
 });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && IV) closeItem(); });
+["pc", "qc"].forEach((id) => { $(id).addEventListener("mousemove", hoverAt); $(id).addEventListener("mouseleave", hoverOut); });
+window.addEventListener("resize", () => { if (IV) drawItem(); });
 
 page = PAGES[location.hash.slice(1)] ? location.hash.slice(1) : "overview";
 document.querySelectorAll("#nav a").forEach((a) => a.classList.toggle("active", a.dataset.page === page));
