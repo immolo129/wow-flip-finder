@@ -62,6 +62,8 @@ def main():
                       password=password or None, site_id=os.environ.get("GITHUB_REPOSITORY", "local"))
 
     print("::notice::Published: " + ", ".join(f"{v} {k}" for k, v in summary.items()))
+    if collector.INDEX_NOTE:
+        print("::notice::" + collector.INDEX_NOTE)
 
     # shrink the database before it's uploaded, and fold the WAL file back into it
     db.execute("VACUUM")

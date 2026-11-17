@@ -331,34 +331,51 @@ def _name(v):
     return v
 
 
+INDEX_NOTE = ""  # what the last item-list fetch did, for the run summary
+
+
 def fetch_item_index(db, api, force=False, max_pages=200):
-    """Every item in Forever's item database (name, quality, vendor price), weekly. -> items stored"""
+    """Every item in the item database (name, quality, vendor price), weekly. Tries Forever's own item
+    search, then Classic Era's (Forever is built on it). -> items stored"""
+    global INDEX_NOTE
     now = int(time.time())
     last = db.one("SELECT value FROM meta WHERE key='items_index_ts'")
     if not force and last and now - int(last["value"]) < INDEX_REFRESH_DAYS * 86400:
+        INDEX_NOTE = "item list up to date"
         return 0
-    rows, page = [], 1
-    while page <= max_pages:
-        d = api.search_items(page)
-        if not d:
-            break
-        for res in d.get("results") or []:
-            it = res.get("data") or {}
-            name = _name(it.get("name"))
-            if not it.get("id") or not name:
-                continue
-            q = it.get("quality") or {}
-            rows.append((it["id"], name, q.get("type") if isinstance(q, dict) else None, it.get("sell_price") or 0, now))
-        if page >= (d.get("pageCount") or 1):
-            break
-        page += 1
+    rows, notes = {}, []
+    for ns in ("static-forever", "static-classic1x"):
+        got, page = 0, 1
+        try:
+            while page <= max_pages:
+                d = api.search_items(page, ns)
+                if not d:
+                    notes.append(f"{ns}: not found" if page == 1 else f"{ns}: stopped at page {page}")
+                    break
+                for res in d.get("results") or []:
+                    it = res.get("data") or {}
+                    name = _name(it.get("name"))
+                    if not it.get("id") or not name or it["id"] in rows:
+                        continue
+                    q = it.get("quality") or {}
+                    rows[it["id"]] = (it["id"], name, q.get("type") if isinstance(q, dict) else None, it.get("sell_price") or 0, now)
+                    got += 1
+                if page >= (d.get("pageCount") or 1):
+                    break
+                page += 1
+        except Exception as e:
+            notes.append(f"{ns}: {str(e)[:80]}")
+        if got:
+            notes.append(f"{ns}: {got} items")
+    INDEX_NOTE = "item list: " + "; ".join(notes)
     if not rows:
-        log.warning("Item search returned nothing; searching covers known items only")
+        log.warning("Item search returned nothing (%s); searching covers known items only", "; ".join(notes))
         return 0
     # upsert: keeps icons and vendor prices; names from the search count as found items
     db.executemany("""INSERT INTO items (item_id, name, quality, sell_price, found, fetched_ts) VALUES (?,?,?,?,1,?)
                       ON CONFLICT(item_id) DO UPDATE SET name=excluded.name,
-                        quality=COALESCE(excluded.quality, items.quality), sell_price=excluded.sell_price, found=1""", rows)
+                        quality=COALESCE(excluded.quality, items.quality), sell_price=excluded.sell_price, found=1""",
+                   list(rows.values()))
     db.execute("INSERT OR REPLACE INTO meta VALUES ('items_index_ts', ?)", (str(now),))
     return len(rows)
 

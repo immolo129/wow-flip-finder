@@ -115,9 +115,9 @@ class BlizzardAPI:
     def item(self, item_id):
         return self._static(f"/data/wow/item/{item_id}", f"item {item_id}")
 
-    def search_items(self, page, page_size=1000):
+    def search_items(self, page, namespace="static-forever", page_size=1000):
         """One page of Blizzard's item search, ordered by id. -> {"pageCount": n, "results": [{"data": {...}}]}"""
-        return self.get("/data/wow/search/item", "static-forever",
+        return self.get("/data/wow/search/item", namespace,
                         {"orderby": "id", "_page": page, "_pageSize": page_size})
 
     def item_icon(self, item_id):
