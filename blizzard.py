@@ -25,7 +25,8 @@ class BlizzardError(RuntimeError):
 class BlizzardAPI:
     def __init__(self, client_id, client_secret, region="eu", locale="en_GB"):
         if not client_id or not client_secret:
-            raise BlizzardError("Missing BLIZZARD_CLIENT_ID / BLIZZARD_CLIENT_SECRET in .env")
+            raise BlizzardError("Missing BLIZZARD_CLIENT_ID / BLIZZARD_CLIENT_SECRET "
+                                "(the .env file on your PC, or the repository secrets on GitHub)")
         self.client_id = client_id
         self.client_secret = client_secret
         self.region = region.lower()
@@ -46,7 +47,8 @@ class BlizzardAPI:
             timeout=30,
         )
         if r.status_code == 401:
-            raise BlizzardError("Blizzard rejected the client id/secret (401). Check your .env.")
+            raise BlizzardError("Blizzard rejected the client id/secret (401). Check the keys: "
+                                "the .env file on your PC, or the repository secrets on GitHub.")
         r.raise_for_status()
         j = r.json()
         self._token = j["access_token"]

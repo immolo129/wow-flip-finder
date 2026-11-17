@@ -1,8 +1,11 @@
 """Run by GitHub Actions every hour (.github/workflows/collect.yml):
 fetch the auction data into flips.db, then write the static site for GitHub Pages.
 
-    python cloud.py --db flips.db --out site
+    python cloud.py --db flips.db --out site --require-password
     python cloud.py --demo --out site       site with demo data, to check the build without keys
+
+The data files are encrypted with the SITE_PASSWORD environment variable when it's set.
+--require-password refuses to publish anything readable without one (used on GitHub).
 """
 import argparse
 import logging
@@ -25,8 +28,12 @@ def main():
     p.add_argument("--db", default="flips.db")
     p.add_argument("--out", default="site")
     p.add_argument("--demo", action="store_true")
+    p.add_argument("--require-password", action="store_true")
     args = p.parse_args()
     cfg = config.load()
+    password = os.environ.get("SITE_PASSWORD", "")
+    if args.require_password and not password:
+        raise SystemExit("SITE_PASSWORD is not set. Refusing to publish the data unencrypted.")
 
     db = DB(args.db)
     extra = {"live": False, "demo": args.demo, "last_error": None}
@@ -44,9 +51,15 @@ def main():
             log.exception("Collection failed")
             extra["last_error"] = str(e)
             db.execute("INSERT INTO runs (ts, ok, message) VALUES (?,?,?)", (int(time.time()), 0, str(e)))
+            if "401" in str(e):
+                # safe hint for the log: lengths only, never the keys themselves
+                print(f"::warning::BLIZZARD_CLIENT_ID is {len(cfg['client_id'])} characters and "
+                      f"BLIZZARD_CLIENT_SECRET is {len(cfg['client_secret'])}. Blizzard's are normally 32 each. "
+                      "If they look right, check they aren't swapped.")
 
     # the page is published even after a failed fetch, so the error shows on it
-    export.write_site(db, cfg, args.out, config.HERE / "static", extra)
+    export.write_site(db, cfg, args.out, config.HERE / "static", extra,
+                      password=password or None, site_id=os.environ.get("GITHUB_REPOSITORY", "local"))
 
     # shrink the database before it's uploaded, and fold the WAL file back into it
     db.execute("VACUUM")

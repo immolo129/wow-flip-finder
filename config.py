@@ -21,8 +21,9 @@ def load():
     load_env(HERE / ".env")
     e = os.environ.get
     return {
-        "client_id": e("BLIZZARD_CLIENT_ID", ""),
-        "client_secret": e("BLIZZARD_CLIENT_SECRET", ""),
+        # strip: a space or line break pasted along with a key makes Blizzard reject it
+        "client_id": e("BLIZZARD_CLIENT_ID", "").strip(),
+        "client_secret": e("BLIZZARD_CLIENT_SECRET", "").strip(),
         "region": e("REGION") or "eu",
         "ruleset": int(e("RULESET") or 1),
         "faction": (e("FACTION") or "horde").lower(),

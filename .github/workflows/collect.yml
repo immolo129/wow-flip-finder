@@ -2,6 +2,10 @@
 #
 # The price history (flips.db) is kept as a file on a release called "data" in this repo,
 # so the repo itself doesn't grow. Don't delete that release, or the history starts over.
+#
+# Everything published is encrypted with the SITE_PASSWORD secret: the page's data files
+# (decrypted in the browser) and the stored database (openssl). Changing SITE_PASSWORD makes
+# the stored database unreadable, so the job fails; delete the release to start over.
 
 name: Collect auction data
 
@@ -30,37 +34,55 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       BLIZZARD_CLIENT_ID: ${{ secrets.BLIZZARD_CLIENT_ID }}
       BLIZZARD_CLIENT_SECRET: ${{ secrets.BLIZZARD_CLIENT_SECRET }}
+      SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
       REGION: ${{ vars.REGION || 'eu' }}
       RULESET: ${{ vars.RULESET || '1' }}
       FACTION: ${{ vars.FACTION || 'horde' }}
     steps:
+      - name: Check the secrets are set
+        run: |
+          missing=""
+          for s in BLIZZARD_CLIENT_ID BLIZZARD_CLIENT_SECRET SITE_PASSWORD; do
+            [ -n "${!s}" ] || missing="$missing $s"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secret(s):$missing (Settings > Secrets and variables > Actions)"
+            exit 1
+          fi
+
       - uses: actions/checkout@v5
 
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
-      - run: pip install requests
+      - run: pip install requests cryptography
 
       - name: Download the price history
         run: |
-          if ! gh release view data >/dev/null 2>&1; then
+          assets=$(gh release view data --json assets -q '.assets[].name' 2>/dev/null) || {
             echo "First run: creating the 'data' release that stores the database"
             gh release create data --title "Price history" --latest=false \
-              --notes "Database used by the hourly job. Don't delete this release, or the price history starts over."
-          elif gh release view data --json assets -q '.assets[].name' | grep -qx flips.db.gz; then
-            gh release download data -p flips.db.gz
+              --notes "Encrypted database used by the hourly job. Don't delete this release, or the price history starts over."
+          }
+          # an unencrypted copy from before the password was added: remove it
+          if echo "$assets" | grep -qx flips.db.gz; then gh release delete-asset data flips.db.gz -y; fi
+          if echo "$assets" | grep -qx flips.db.gz.enc; then
+            gh release download data -p flips.db.gz.enc
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -pass env:SITE_PASSWORD -in flips.db.gz.enc -out flips.db.gz \
+              || { echo "::error::Can't decrypt the stored price history. Was SITE_PASSWORD changed? Delete the 'data' release to start over."; exit 1; }
             gunzip flips.db.gz
           fi
 
       - name: Fetch auctions and build the page
         id: collect
-        run: python cloud.py --db flips.db --out site
+        run: python cloud.py --db flips.db --out site --require-password
 
       - name: Save the price history
         run: |
           gzip -9 flips.db
-          gh release upload data flips.db.gz --clobber
+          openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt -pass env:SITE_PASSWORD -in flips.db.gz -out flips.db.gz.enc
+          gh release upload data flips.db.gz.enc --clobber
 
       - uses: actions/configure-pages@v5
 

@@ -67,6 +67,17 @@
   .empty { padding: 40px; text-align: center; color: var(--muted); background: var(--panel); }
   .totals { color: var(--muted); font-size: 13px; margin: 8px 2px; }
   footer { color: var(--muted); font-size: 12px; margin-top: 18px; }
+  #lock { display: none; max-width: 360px; margin: 12vh auto 0; background: var(--panel); border: 1px solid var(--line);
+          border-radius: 10px; padding: 24px; }
+  #lock h2 { margin: 0 0 6px; font-size: 17px; }
+  #lock p { color: var(--muted); margin: 0 0 14px; font-size: 13px; }
+  #lock input[type=password] { width: 100%; background: var(--panel2); color: var(--text); border: 1px solid var(--line);
+          border-radius: 6px; padding: 9px 10px; font: inherit; margin-bottom: 10px; }
+  #lock label { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 13px; margin-bottom: 14px; }
+  #lock button { width: 100%; padding: 9px; }
+  #lock .err { color: var(--bad); min-height: 1.4em; margin: 10px 0 0; }
+  body.locked main, body.locked .status { display: none; }
+  body.locked #lock { display: block; }
   @media (max-width: 700px) { header, main { padding-left: 12px; padding-right: 12px; } }
 </style>
 </head>
@@ -75,6 +86,15 @@
   <h1><span>⚖</span> Forever Flip Finder</h1>
   <div class="status" id="status">Loading…</div>
 </header>
+
+<form id="lock">
+  <h2>Locked</h2>
+  <p>Enter the password to see the flips.</p>
+  <input type="password" id="pw" autocomplete="current-password" placeholder="Password" required>
+  <label><input type="checkbox" id="remember" checked> Remember on this device</label>
+  <button type="submit" id="unlockbtn">Unlock</button>
+  <p class="err" id="lockerr"></p>
+</form>
 
 <main>
   <div class="tabs">
@@ -190,16 +210,79 @@ function toCalc(k, f) {
 const factionFor = (f) => (f.all ? null : D.status.faction);
 const compute = (k, f) => FLIPS[k](D, toCalc(k, f), factionFor(f));
 
+// ---------- password lock ----------
+// On GitHub the data files are encrypted (see export.py). The key is derived from the
+// password with PBKDF2 and, if "remember" is ticked, kept in this browser's localStorage.
+let KEY = null, pending = null;
+const LOCKED = new Error("locked"), WRONG = new Error("wrong password");
+const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+const tob64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+
+async function deriveKey(password, salt, iter) {
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({ name: "PBKDF2", salt: unb64(salt), iterations: iter, hash: "SHA-256" },
+    base, { name: "AES-GCM", length: 256 }, true, ["decrypt"]);
+}
+async function storedKey(salt) {
+  try {
+    const s = JSON.parse(localStorage.getItem("ff-key") || "null");
+    if (s && s.salt === salt) return await crypto.subtle.importKey("raw", unb64(s.k), "AES-GCM", true, ["decrypt"]);
+  } catch (e) {}
+  return null;
+}
+function forgetKey() { KEY = null; try { localStorage.removeItem("ff-key"); } catch (e) {} }
+
+// Encrypted wrapper -> original object; anything else is returned as it is (local app).
+async function unlock(obj) {
+  if (!obj || !obj.enc) return obj;
+  if (!KEY) KEY = await storedKey(obj.salt);
+  if (!KEY) throw LOCKED;
+  try {
+    const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(obj.iv) }, KEY, unb64(obj.ct));
+    return JSON.parse(new TextDecoder().decode(plain));
+  } catch (e) { forgetKey(); throw WRONG; }
+}
+
+function showLock(raw, msg) {
+  pending = raw;
+  document.body.classList.add("locked");
+  $("lockerr").textContent = msg || "";
+  $("unlockbtn").disabled = false; $("unlockbtn").textContent = "Unlock";
+  $("pw").focus();
+}
+$("lock").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!pending) return;
+  $("unlockbtn").disabled = true; $("unlockbtn").textContent = "Unlocking…";
+  KEY = await deriveKey($("pw").value, pending.salt, pending.iter);
+  if ($("remember").checked) {
+    try { localStorage.setItem("ff-key", JSON.stringify({ salt: pending.salt, k: tob64(await crypto.subtle.exportKey("raw", KEY)) })); } catch (e) {}
+  }
+  $("pw").value = "";
+  loadData();
+});
+
 // ---------- data ----------
 async function loadData() {
+  let raw;
   try {
     const r = await fetch("data/latest.json", { cache: "no-store" });
     if (!r.ok) throw new Error("HTTP " + r.status);
-    D = prepare(await r.json());
+    raw = await r.json();
   } catch (e) {
     $("status").innerHTML = `<span class="pill err">Couldn't load data: ${esc(e.message)}</span>`;
     return;
   }
+  try {
+    D = prepare(await unlock(raw));
+  } catch (e) {
+    if (e === LOCKED || e === WRONG) return showLock(raw, e === WRONG ? "Wrong password, try again." : "");
+    $("status").innerHTML = `<span class="pill err">Couldn't read data: ${esc(e.message)}</span>`;
+    return;
+  }
+  D.encrypted = !!raw.enc;
+  document.body.classList.remove("locked");
+  $("lockerr").textContent = "";
   shardCache.clear();
   renderStatus();
   recompute();
@@ -261,9 +344,10 @@ function render() {
 }
 
 // ---------- price history ----------
-async function history(houseId, itemId) {
+async function loadHistory(houseId, itemId) {
   const k = itemId % SHARDS;
-  if (!shardCache.has(k)) shardCache.set(k, fetch(`data/history/${k}.json`, { cache: "no-store" }).then((r) => r.ok ? r.json() : {}).catch(() => ({})));
+  if (!shardCache.has(k)) shardCache.set(k, fetch(`data/history/${k}.json`, { cache: "no-store" })
+    .then((r) => r.ok ? r.json() : {}).then(unlock).catch(() => ({})));
   const series = (await shardCache.get(k))[houseId + ":" + itemId] || [];
   return series.map(([ts, min_price, market]) => ({ ts, min_price, market }));
 }
@@ -283,7 +367,7 @@ async function toggleDetail(tr) {
     <b style="color:var(--accent)">— market (cheapest 25 %)</b> &nbsp; <b style="color:#6aa6ff">— lowest listing</b>
     ${r.buy_house ? ` · buying in ${esc(r.buy_house)}` : ""}</div></td>`;
   tr.after(d);
-  drawChart(d.querySelector("canvas"), await history(r.house_id, r.item_id));
+  drawChart(d.querySelector("canvas"), await loadHistory(r.house_id, r.item_id));
 }
 
 function drawChart(cv, hist) {
@@ -325,7 +409,9 @@ function renderStatus() {
   else if (!s.live && !s.demo) parts.push("updates hourly");
   if (s.last_error) parts.push(`<span class="pill err" title="${esc(s.last_error)}">last fetch failed</span>`);
   if (s.live) parts.push('<button id="fetchnow">Fetch now</button>');
+  if (D.encrypted) parts.push('<button id="lockbtn" title="Forget the password on this device">Lock</button>');
   $("status").innerHTML = parts.join(" ");
+  if ($("lockbtn")) $("lockbtn").onclick = () => { forgetKey(); D = null; loadData(); };
   const b = $("fetchnow");
   if (b) b.onclick = async () => {
     b.disabled = true; b.textContent = "Fetching…";

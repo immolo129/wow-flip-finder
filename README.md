@@ -26,10 +26,12 @@ GitHub runs the fetch every hour and publishes the page with GitHub Pages.
    and click **Publish to GitHub**. Choose **public repository**, because free
    GitHub Pages only works on public repos. `.gitignore` keeps your `.env` file
    (your keys) and the databases out of it.
-4. **Add your keys as secrets.** On the repo's GitHub page go to **Settings →
+4. **Add your keys and a password as secrets.** On the repo's GitHub page go to **Settings →
    Secrets and variables → Actions → New repository secret** and add:
    - `BLIZZARD_CLIENT_ID`
    - `BLIZZARD_CLIENT_SECRET`
+   - `SITE_PASSWORD`: the password for your page. Make it long and don't use
+     it anywhere else, for example four random words like `lantern-otter-cobalt-mirror`.
 
    Secrets are encrypted and never visible, not even in a public repo.
    *Optional:* on the **Variables** tab, add `REGION`, `RULESET` or `FACTION`
@@ -42,7 +44,13 @@ GitHub runs the fetch every hour and publishes the page with GitHub Pages.
 
 After that it runs by itself every hour. Good to know:
 
-- Anyone with the link can see the page (it's public, but nobody will find it unless you share it).
+- The page is locked with your password. Anyone who opens the link only sees a
+  password box: the price data and the stored history are encrypted with it.
+  Tick "Remember on this device" so it doesn't ask every time; the **Lock**
+  button at the top forgets it again. The code itself is public, but it holds
+  nothing private.
+- If you change `SITE_PASSWORD`, the stored history can't be read any more and
+  the job fails. Delete the **data** release (repo page → Releases) to start over.
 - GitHub sometimes starts the hourly run 5–30 minutes late.
 - The price history is stored as a file on a release called **data** in your
   repo. Don't delete that release, or the history starts over.

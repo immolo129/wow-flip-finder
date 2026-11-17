@@ -4,6 +4,7 @@ Forever Flip Finder fetches WoW: Forever auction house data from the Blizzard AP
 
 It runs two ways, sharing all code except the entry point:
 - **GitHub (main way):** `.github/workflows/collect.yml` runs `cloud.py` hourly, which collects and writes a static site (`export.write_site`) that is published to GitHub Pages. `flips.db` is kept gzipped as an asset on a release named `data`, not in git.
+  The repo and Pages are public, so everything published is encrypted with the `SITE_PASSWORD` secret: the JSON files (AES-256-GCM, PBKDF2 key, see `export.make_encryptor`; decrypted in the browser by `unlock()` in `index.html`) and the release asset `flips.db.gz.enc` (openssl in the workflow). `cloud.py --require-password` refuses to publish without it. Never publish data unencrypted.
 - **Local:** `app.py` (Flask) collects hourly and serves the same page, building the same JSON on the fly.
 
 The flip maths runs in the browser (`static/flips.js`) on `data/latest.json`, so both ways compute flips identically.
@@ -45,6 +46,8 @@ There are no tests. To check a change, run demo mode, which needs no API keys an
 - **Units.** All prices in the database, JSON and `flips.js` are integer copper per unit (1 g = 10 000 c). The page's filter boxes are in gold and whole percentages; `toCalc()` in `index.html` converts them to copper and fractions before calling `flips.js`.
 - **AH cut.** Faction houses take 5 % and the neutral Blackwater house takes 15 % (`FACTION_CUT`/`NEUTRAL_CUT` in `flips.js`). Profit figures already include the cut.
 - **Static site paths.** The page is served from a GitHub Pages subpath (`/<repo>/`), so `index.html` must use relative URLs (`data/latest.json`, not `/data/latest.json`).
+- **Global names in `index.html`.** Scripts there are plain globals, so don't name functions after browser globals (`history`, `close`, `open`, `name`, `status`...). A function called `history` silently broke the price chart once.
+- **Testing the locked page headless.** Edge's `--virtual-time-budget` doesn't wait for the 600 000-round PBKDF2, so set `export.PBKDF2_ITER` low for browser tests.
 - **Database size on GitHub.** `cloud.py` keeps only 8 days (`KEEP_DAYS`) and VACUUMs before upload; the local app keeps 21.
 - **The Forever API is undocumented.** It uses the `dynamic-forever-{region}` and `static-forever-{region}` namespaces. The auction house index URL needs its trailing slash. Item lookups fall back to `static-classic1x` because Forever item data is incomplete. Don't "fix" these endpoints without evidence.
 - **Schema changes.** `CREATE TABLE IF NOT EXISTS` doesn't change tables in an existing `flips.db`. When you add a column, also add it to `MIGRATIONS` in `storage.py`.

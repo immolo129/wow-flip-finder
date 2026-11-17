@@ -5,8 +5,16 @@
 
 The local app serves these on the fly; on GitHub, cloud.py writes them into the static site.
 The flip maths itself runs in the browser (static/flips.js).
+
+With a password, every JSON file is written encrypted instead:
+    {"enc": 1, "salt": b64, "iter": n, "iv": b64, "ct": b64}
+AES-256-GCM with a key from PBKDF2-SHA256(password, salt, iter). The page asks for the
+password and decrypts with WebCrypto (see unlock() in index.html).
 """
+import base64
+import hashlib
 import json
+import os
 import shutil
 import time
 from collections import defaultdict
@@ -16,6 +24,22 @@ from config import RULESET_NAMES
 
 SHARDS = 64
 HISTORY_DAYS = 7
+PBKDF2_ITER = 600_000  # slows down password guessing; the browser derives the key once per visit
+
+
+def make_encryptor(password, site_id):
+    """-> function(bytes) -> encrypted wrapper dict. The salt is fixed per site (not per build),
+    so a key remembered in the browser keeps working after each hourly update."""
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM  # only needed on GitHub
+
+    salt = hashlib.sha256(f"forever-flip-finder:{site_id}".encode()).digest()[:16]
+    aes = AESGCM(hashlib.pbkdf2_hmac("sha256", password.encode(), salt, PBKDF2_ITER, 32))
+    b64 = lambda b: base64.b64encode(b).decode()
+
+    def encrypt(data):
+        iv = os.urandom(12)
+        return {"enc": 1, "salt": b64(salt), "iter": PBKDF2_ITER, "iv": b64(iv), "ct": b64(aes.encrypt(iv, data, None))}
+    return encrypt
 
 
 def status(db, cfg, extra=None):
@@ -85,19 +109,23 @@ def history_shard(db, ruleset, shard):
     return _group(_history_rows(db, ruleset, shard)).get(shard, {})
 
 
-def _dump(obj, path):
-    path.write_text(json.dumps(obj, separators=(",", ":")), encoding="utf-8")
+def write_site(db, cfg, out_dir, static_dir, extra=None, password=None, site_id="local"):
+    """Write the complete static site (page + data) into out_dir, encrypted if a password is given."""
+    encrypt = make_encryptor(password, site_id) if password else None
 
+    def dump(obj, path):
+        text = json.dumps(obj, separators=(",", ":"))
+        if encrypt:
+            text = json.dumps(encrypt(text.encode()), separators=(",", ":"))
+        path.write_text(text, encoding="utf-8")
 
-def write_site(db, cfg, out_dir, static_dir, extra=None):
-    """Write the complete static site (page + data) into out_dir."""
     out = Path(out_dir)
     if out.exists():
         shutil.rmtree(out)
     shutil.copytree(static_dir, out)
     (out / "data" / "history").mkdir(parents=True)
-    _dump(latest(db, cfg, extra), out / "data" / "latest.json")
+    dump(latest(db, cfg, extra), out / "data" / "latest.json")
     shards = _group(_history_rows(db, cfg["ruleset"]))
     for k in range(SHARDS):
-        _dump(shards.get(k, {}), out / "data" / "history" / f"{k}.json")
+        dump(shards.get(k, {}), out / "data" / "history" / f"{k}.json")
     (out / ".nojekyll").write_text("")
