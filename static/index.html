@@ -43,6 +43,10 @@
   nav a .n { margin-left: auto; font-size: 11px; color: var(--accent); background: var(--accent-soft);
              padding: 1px 7px; border-radius: 99px; font-weight: 600; }
   nav a .n:empty { display: none; }
+  nav a.sub { padding: 6px 10px 6px 20px; font-size: 13px; }
+  nav a.sub .pdot { width: 6px; height: 6px; border-radius: 50%; background: var(--line2); margin: 0 6px 0 2px; flex: none; }
+  nav a.sub.active .pdot { background: var(--accent); }
+  nav { overflow-y: auto; min-height: 0; }
   .navlabel { display: flex; align-items: center; width: 100%; background: none; border: 0; color: var(--muted);
               font-size: 13px; font-weight: 500; padding: 16px 10px 6px; text-align: left; }
   .navlabel:hover { color: var(--text); }
@@ -321,7 +325,8 @@
       <div class="group" data-group="craft">
         <button class="navlabel" type="button">Crafting &amp; professions<svg class="i chev"><use href="#i-chev"/></svg></button>
         <div class="items">
-          <a href="#craft" data-page="craft"><svg class="i"><use href="#i-craft"/></svg>Crafting profits<span class="n" id="n-craft"></span></a>
+          <a href="#craft" data-page="craft"><svg class="i"><use href="#i-craft"/></svg>All professions<span class="n" id="n-craft"></span></a>
+          <div id="craftnav"></div>
         </div>
       </div>
     </nav>
@@ -384,7 +389,6 @@
         <div class="summary" id="summary"></div>
         <div class="card">
           <div class="filters" id="filters">
-            <label data-for="craft">Profession<select id="f-profession"><option value="">All professions</option></select></label>
             <label data-for="reset arbitrage vendor craft">Min profit (gold)<input type="number" id="f-min_profit" step="0.1" min="0"></label>
             <label data-for="reset arbitrage craft">Min ROI %<input type="number" id="f-min_roi" step="1" min="0"></label>
             <label data-for="reset">Buy below % of market<input type="number" id="f-buy_pct" step="1" min="10" max="100"></label>
@@ -434,7 +438,7 @@ const DEFAULTS = {
   reset:     { min_profit: 0.5, min_roi: 15, buy_pct: 80, min_seen: 3, min_listings: 2, sell_days: 2 },
   arbitrage: { min_profit: 0.5, min_roi: 20, min_seen: 3, min_listings: 2, sell_days: 2 },
   vendor:    { min_profit: 0.01 },
-  craft:     { profession: "", min_profit: 0.5, min_roi: 10, min_seen: 3 },
+  craft:     { min_profit: 0.5, min_roi: 10, min_seen: 3 },
 };
 const PAGES = {
   reset: { title: "Underpriced", tag: "Underpriced", icon: "i-reset",
@@ -470,7 +474,7 @@ const KINDS = ["reset", "arbitrage", "vendor", "craft"];
 const MAX_ROWS = 500;
 const SHARDS = 64;
 
-let page = "overview", kind = "reset", D = null, rows = [], all = {}, sortKey = "profit", sortAsc = false;
+let craftProf = "", page = "overview", kind = "reset", D = null, rows = [], all = {}, sortKey = "profit", sortAsc = false;
 const shardCache = new Map();
 const $ = (id) => document.getElementById(id);
 
@@ -501,7 +505,7 @@ function savedFilters(k) {
 function filtersFor(k) { return { ...DEFAULTS[k], ...savedFilters(k) }; }
 function loadFilters() {
   const f = filtersFor(kind);
-  for (const k of ["profession", "min_profit", "min_roi", "buy_pct", "min_seen", "min_listings", "sell_days"]) if (f[k] !== undefined) $("f-" + k).value = f[k];
+  for (const k of ["min_profit", "min_roi", "buy_pct", "min_seen", "min_listings", "sell_days"]) if (f[k] !== undefined) $("f-" + k).value = f[k];
   $("f-include_alt").checked = !!f.include_alt;
   document.querySelectorAll("#filters [data-for]").forEach((el) => {
     el.style.display = el.dataset.for.split(" ").includes(kind) ? "" : "none";
@@ -524,11 +528,19 @@ function toCalc(k, f) {
     include_alt: !!f.include_alt, profession: f.profession || "",
   };
 }
-function fillProfessions() {
-  const sel = $("f-profession"), cur = filtersFor("craft").profession || "";
+// Sidebar: one entry per profession that has recipes, with its number of profitable recipes.
+function fillCraftNav() {
+  const counts = {};
+  for (const r of all.craft || []) counts[r.profession] = (counts[r.profession] || 0) + 1;
   const profs = [...new Set(D.recipes.map((r) => r[2]))].sort();
-  sel.innerHTML = `<option value="">All professions</option>` +
-    profs.map((p) => `<option value="${esc(p)}"${p === cur ? " selected" : ""}>${esc(p)}</option>`).join("");
+  $("craftnav").innerHTML = profs.map((p) =>
+    `<a class="sub" href="#craft/${encodeURIComponent(p)}" data-page="craft/${esc(p)}"><span class="pdot"></span>${esc(p)}` +
+    `<span class="n">${counts[p] || ""}</span></a>`).join("");
+  markNav();
+}
+function markNav() {
+  const cur = page === "craft" && craftProf ? "craft/" + craftProf : page;
+  document.querySelectorAll("#nav a").forEach((a) => a.classList.toggle("active", a.dataset.page === cur));
 }
 const showAll = () => prefs().houses === "all";
 const faction = () => (showAll() ? null : D.status.faction);
@@ -606,7 +618,6 @@ async function loadData() {
     return;
   }
   D.encrypted = !!raw.enc;
-  fillProfessions();
   document.body.classList.remove("locked");
   $("lockerr").textContent = "";
   shardCache.clear();
@@ -620,6 +631,7 @@ function refresh() {
     all[k] = compute(k, filtersFor(k));
     $("n-" + k).textContent = all[k].length || "";
   }
+  fillCraftNav();
   renderChrome();
   if (page === "item") {
     const r = itemFromHash();
@@ -632,6 +644,7 @@ function refresh() {
     return;
   }
   if (page === "overview") renderOverview();
+  else if (kind === "craft") { rows = compute("craft", { ...readFilters(), profession: craftProf }); renderPage(); }
   else { rows = compute(kind, readFilters()); all[kind] = rows; $("n-" + kind).textContent = rows.length || ""; renderPage(); }
 }
 
@@ -1021,15 +1034,19 @@ function showPage(p) {
     return;
   }
   if (page === "item") { document.body.classList.remove("itemmode", "drawer"); IV = null; document.title = "Forever Flip Finder"; }
+  // #craft/<profession> = the crafting page for one profession
+  const m = /^craft\/(.+)$/.exec(p);
+  if (m) { craftProf = decodeURIComponent(m[1]); p = "craft"; } else if (p === "craft") craftProf = "";
   if (!PAGES[p]) p = "overview";
   page = p;
-  document.querySelectorAll("#nav a").forEach((a) => a.classList.toggle("active", a.dataset.page === p));
+  markNav();
   $("page-overview").hidden = p !== "overview";
   $("page-flips").hidden = p === "overview";
-  $("search").placeholder = p === "overview" ? "Search items in all flips…" : `Search ${PAGES[p].title.toLowerCase()} flips…`;
+  const title = p === "craft" && craftProf ? craftProf : p !== "overview" ? PAGES[p].title : "";
+  $("search").placeholder = p === "overview" ? "Search items in all flips…" : `Search ${title.toLowerCase()} ${p === "craft" ? "recipes" : "flips"}…`;
   if (p !== "overview") {
     if (kind !== p) { kind = p; sortKey = "profit"; sortAsc = false; }
-    $("ptitle").textContent = PAGES[p].title;
+    $("ptitle").textContent = p === "craft" && craftProf ? `${craftProf} profits` : PAGES[p].title;
     $("phelp").textContent = PAGES[p].help;
     loadFilters();
   }
@@ -1089,12 +1106,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape" && IV) clos
 ["pc", "qc"].forEach((id) => { $(id).addEventListener("mousemove", hoverAt); $(id).addEventListener("mouseleave", hoverOut); });
 window.addEventListener("resize", () => { if (IV) drawItem(); });
 
-page = PAGES[location.hash.slice(1)] ? location.hash.slice(1) : /^#item\/\d+\/\d+/.test(location.hash) ? "item" : "overview";
-if (page === "item") document.body.classList.add("itemmode");
-document.querySelectorAll("#nav a").forEach((a) => a.classList.toggle("active", a.dataset.page === page));
-$("page-overview").hidden = page !== "overview";
-$("page-flips").hidden = page === "overview";
-if (PAGES[page]) { kind = page; $("ptitle").textContent = PAGES[page].title; $("phelp").textContent = PAGES[page].help; loadFilters(); }
+showPage(location.hash.slice(1) || "overview");   // nothing to draw until loadData() brings the data
 loadData();
 setInterval(loadData, 10 * 60000);   // new data arrives about once an hour
 </script>
