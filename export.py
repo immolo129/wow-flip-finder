@@ -135,8 +135,13 @@ def write_site(db, cfg, out_dir, static_dir, extra=None, password=None, site_id=
         shutil.rmtree(out)
     shutil.copytree(static_dir, out)
     (out / "data" / "history").mkdir(parents=True)
-    dump(latest(db, cfg, extra), out / "data" / "latest.json")
+    data = latest(db, cfg, extra)
+    dump(data, out / "data" / "latest.json")
     shards = _group(_history_rows(db, cfg["ruleset"]))
     for k in range(SHARDS):
         dump(shards.get(k, {}), out / "data" / "history" / f"{k}.json")
     (out / ".nojekyll").write_text("")
+    # counts only (nothing secret), for the run log
+    return {"houses": len(data["houses"]), "items listed": len(data["ladders"]),
+            "recipes": len(data["recipes"]), "professions": len({r[2] for r in data["recipes"]}),
+            "icons": sum(1 for it in data["items"].values() if it[3]), "items": len(data["items"])}

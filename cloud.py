@@ -58,8 +58,10 @@ def main():
                       "If they look right, check they aren't swapped.")
 
     # the page is published even after a failed fetch, so the error shows on it
-    export.write_site(db, cfg, args.out, config.HERE / "static", extra,
+    summary = export.write_site(db, cfg, args.out, config.HERE / "static", extra,
                       password=password or None, site_id=os.environ.get("GITHUB_REPOSITORY", "local"))
+
+    print("::notice::Published: " + ", ".join(f"{v} {k}" for k, v in summary.items()))
 
     # shrink the database before it's uploaded, and fold the WAL file back into it
     db.execute("VACUUM")
