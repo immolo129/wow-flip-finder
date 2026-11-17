@@ -154,4 +154,6 @@ def write_site(db, cfg, out_dir, static_dir, extra=None, password=None, site_id=
     return {"houses": len(data["houses"]), "items listed": len(data["ladders"]),
             "recipes": len(data["recipes"]), "professions": len({r[2] for r in data["recipes"]}),
             "icons": sum(1 for it in data["items"].values() if it[3]), "items": len(data["items"]),
-            "region prices": len(data["region"]), "sell rates": sum(1 for m in data["markets"] if m[8] is not None)}
+            "region prices": len(data["region"]), "sell rates": sum(1 for m in data["markets"] if m[8] is not None),
+            "hours of sales tracking": max((m[7] for m in data["markets"]), default=0),
+            "snapshots": (data["status"]["snapshots"] or {}).get("n") or 0}
