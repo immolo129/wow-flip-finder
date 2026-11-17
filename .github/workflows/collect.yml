@@ -1,5 +1,9 @@
 # Every hour: fetch Blizzard's auction data, update the price history and publish the page.
 #
+# GitHub often delays or skips scheduled runs, so the schedule checks every 10 minutes and the
+# "gate" job only lets a run through when the published data is over 45 minutes old. That check
+# takes a few seconds. Pushing a change, or the Run workflow button, always runs straight away.
+#
 # The price history (flips.db) is kept as a file on a release called "data" in this repo,
 # so the repo itself doesn't grow. Don't delete that release, or the history starts over.
 #
@@ -11,8 +15,11 @@ name: Collect auction data
 
 on:
   schedule:
-    - cron: "17 * * * *"   # every hour at :17 (the top of the hour is GitHub's busiest time)
-  workflow_dispatch:        # "Run workflow" button in the Actions tab
+    - cron: "7-59/10 * * * *"   # every 10 minutes, off the busy top of the hour; see the gate job
+  workflow_dispatch:             # "Run workflow" button in the Actions tab
+  push:                          # publish code changes straight away
+    branches: [main]
+    paths-ignore: ["**.md"]
 
 permissions:
   contents: write   # store the database on the release, and the keep-alive commit
@@ -24,7 +31,24 @@ concurrency:
   cancel-in-progress: false   # never let two runs write the database at the same time
 
 jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+    steps:
+      - id: check
+        run: |
+          if [ "${{ github.event_name }}" != "schedule" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          owner="${GITHUB_REPOSITORY%%/*}"; repo="${GITHUB_REPOSITORY#*/}"
+          lm=$(curl -sfI "https://${owner,,}.github.io/${repo}/data/latest.json" | grep -i '^last-modified:' | cut -d' ' -f2- | tr -d '\r' || true)
+          age=$(( $(date +%s) - $(date -d "${lm:-1970-01-01}" +%s) ))
+          echo "Published data is $((age / 60)) minutes old"
+          if [ "$age" -gt 2700 ]; then echo "run=true" >> "$GITHUB_OUTPUT"; else echo "run=false" >> "$GITHUB_OUTPUT"; fi
+
   collect:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment:
