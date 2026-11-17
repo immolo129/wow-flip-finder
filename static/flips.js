@@ -70,7 +70,7 @@ function buyLadder(ladder, maxPrice, maxUnits) {
 
 function itemOf(D, id) {
   const it = D.items[id] || [];
-  return { item_id: id, name: it[0] || `Item ${id}`, quality: it[1] || "", vendor: it[2] || 0 };
+  return { item_id: id, name: it[0] || `Item ${id}`, quality: it[1] || "", vendor: it[2] || 0, icon: it[3] || "" };
 }
 
 function resetFlips(D, f, faction) {

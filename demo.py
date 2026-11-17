@@ -56,6 +56,13 @@ ITEMS = [
     (7972, "Ichor of Undeath", "common", 100, 2900, 120),
 ]
 
+# icons for a few demo items; the rest show the letter fallback, like items Blizzard has no icon for
+ICONS = {
+    14344: "inv_enchant_shardbrilliantlarge", 16204: "inv_enchant_dustillusion",
+    16203: "inv_enchant_essenceeternallarge", 11178: "inv_enchant_shardradientlarge",
+    10940: "inv_enchant_duststrange", 11083: "inv_enchant_dustsoul", 12359: "inv_ingot_07",
+}
+
 HOUSE_FACTOR = {2: 1.00, 6: 1.08, 7: 1.25}
 HOUSE_SUPPLY = {2: 1.0, 6: 1.1, 7: 0.25}
 
@@ -78,8 +85,9 @@ def build(db, ruleset, hours=96, seed=42):
     now = int(time.time()) - 60
     for hid, name, neutral in HOUSES:
         db.execute("INSERT OR REPLACE INTO houses VALUES (?,?,?,?)", (ruleset, hid, name, neutral))
-    db.executemany("INSERT OR REPLACE INTO items VALUES (?,?,?,?,?,?)",
-                   [(i, n, q, v, 1, now) for i, n, q, v, _, _ in ITEMS])
+    db.executemany("""INSERT OR REPLACE INTO items (item_id, name, quality, sell_price, found, fetched_ts, icon, icon_ts)
+                      VALUES (?,?,?,?,?,?,?,?)""",
+                   [(i, n, q, v, 1, now, ICONS.get(i, ""), now) for i, n, q, v, _, _ in ITEMS])
 
     drift = {i: 1.0 for i, *_ in ITEMS}
     turnover = {i: rng.uniform(0.005, 0.06) for i, *_ in ITEMS}  # share of listed units sold per hour

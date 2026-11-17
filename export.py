@@ -71,8 +71,9 @@ def latest(db, cfg, extra=None):
         if (m["house_id"], m["item_id"]) in ladders
     ]
     ids = {i for _, i in ladders}
-    items = {str(r["item_id"]): [r["name"], (r["quality"] or "").lower(), r["sell_price"] or 0]
-             for r in db.query("SELECT item_id, name, quality, sell_price FROM items") if r["item_id"] in ids}
+    # item id -> [name, quality, vendor price, icon file name or ""]
+    items = {str(r["item_id"]): [r["name"], (r["quality"] or "").lower(), r["sell_price"] or 0, r["icon"] or ""]
+             for r in db.query("SELECT item_id, name, quality, sell_price, icon FROM items") if r["item_id"] in ids}
     return {
         "status": status(db, cfg, extra),
         "houses": [[h["house_id"], h["name"], h["neutral"]]

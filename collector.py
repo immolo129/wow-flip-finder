@@ -227,8 +227,33 @@ def fetch_missing_items(db, api, max_items=3000):
 
     with ThreadPoolExecutor(max_workers=8) as ex:
         rows = list(ex.map(one, ids))
-    db.executemany("INSERT OR REPLACE INTO items VALUES (?,?,?,?,?,?)", rows)
+    db.executemany("""INSERT OR REPLACE INTO items (item_id, name, quality, sell_price, found, fetched_ts)
+                      VALUES (?,?,?,?,?,?)""", rows)
     return len(rows)
+
+
+def fetch_missing_icons(db, api, max_items=3000):
+    """Look up icons for listed items that don't have one yet; retry missing ones weekly."""
+    now = int(time.time())
+    ids = [r["item_id"] for r in db.query(
+        """SELECT DISTINCT i.item_id FROM items i JOIN latest_listings l ON l.item_id = i.item_id
+           WHERE i.icon IS NULL OR (i.icon = '' AND i.icon_ts < ?) LIMIT ?""",
+        (now - 7 * 86400, max_items))]
+    if not ids:
+        return 0
+
+    def one(iid):
+        try:
+            icon = api.item_icon(iid)
+        except Exception as e:  # keep going on single failures
+            log.warning("icon %s: %s", iid, e)
+            icon = None
+        return (icon or "", now, iid)
+
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        rows = list(ex.map(one, ids))
+    db.executemany("UPDATE items SET icon=?, icon_ts=? WHERE item_id=?", rows)
+    return sum(1 for icon, _, _ in rows if icon)
 
 
 # ---------- one full run ----------
@@ -301,8 +326,9 @@ def collect(db, api, ruleset, keep_days=21):
 
     recompute_market(db, ruleset)
     n_items = fetch_missing_items(db, api)
+    n_icons = fetch_missing_icons(db, api)
     prune(db, keep_days)
-    msg =f"{len(houses)} houses, {total} listings, {n_items} new item names, {time.time() - t0:.0f}s"
+    msg = f"{len(houses)} houses, {total} listings, {n_items} new item names, {n_icons} new icons, {time.time() - t0:.0f}s"
     if unchanged:
         msg += f"; unchanged: {', '.join(unchanged)}"
     if errors:

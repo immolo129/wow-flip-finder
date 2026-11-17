@@ -124,6 +124,7 @@
   .item { display: flex; align-items: center; gap: 10px; }
   .ico { width: 30px; height: 30px; border-radius: 7px; display: grid; place-items: center; flex: none; font: 700 13px var(--head);
          background: var(--panel2); border: 1px solid currentColor; }
+  img.ico { display: block; object-fit: cover; padding: 0; background: #000; }
   .item .nm { font-weight: 600; }
   .item .acts { display: flex; gap: 4px; opacity: 0; transition: opacity .15s; }
   tr:hover .item .acts, tr.open .item .acts { opacity: 1; }
@@ -564,9 +565,26 @@ function renderChrome() {
 }
 
 // ---------- overview ----------
+// Item icons: Blizzard's image server first, Wowhead's as a backup, then the first letter.
+const ICON_SRC = [
+  (n) => `https://render.worldofwarcraft.com/us/icons/56/${n}.jpg`,
+  (n) => `https://wow.zamimg.com/images/wow/icons/medium/${n}.jpg`,
+];
+const letterIcon = (q, name) => `<span class="ico q-${q}">${esc((name || "?")[0])}</span>`;
+function iconErr(img) {
+  const next = +img.dataset.try + 1;
+  if (ICON_SRC[next]) { img.dataset.try = next; img.src = ICON_SRC[next](img.dataset.icon); }
+  else img.outerHTML = letterIcon(img.dataset.q, img.alt);
+}
+function itemIcon(r, q) {
+  if (!/^[a-z0-9_\-]+$/i.test(r.icon || "")) return letterIcon(q, r.name);
+  return `<img class="ico q-${q}" src="${ICON_SRC[0](r.icon)}" data-icon="${r.icon}" data-try="0" data-q="${q}" ` +
+    `alt="${esc(r.name)}" loading="lazy" referrerpolicy="no-referrer" onerror="iconErr(this)">`;
+}
+
 function itemCell(r) {
   const q = esc(r.quality || "common");
-  return `<td class="l"><div class="item"><span class="ico q-${q}">${esc((r.name || "?")[0])}</span><div>` +
+  return `<td class="l"><div class="item">${itemIcon(r, q)}<div>` +
     `<div class="nm q-${q}">${esc(r.name)}</div></div><span class="acts">` +
     `<button class="mini" data-copy="${esc(r.name)}" title="Copy name for the AH search box">copy</button>` +
     `<a class="mini" href="https://www.wowhead.com/classic/item=${r.item_id}" target="_blank" rel="noopener">wowhead</a></span></div></td>`;

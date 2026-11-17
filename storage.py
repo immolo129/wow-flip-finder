@@ -84,7 +84,9 @@ CREATE TABLE IF NOT EXISTS items (
     quality    TEXT,
     sell_price INTEGER,   -- vendor sell price, copper
     found      INTEGER,
-    fetched_ts INTEGER
+    fetched_ts INTEGER,
+    icon       TEXT,      -- icon file name, e.g. inv_enchant_dustillusion; '' = not found
+    icon_ts    INTEGER    -- when the icon was last looked up
 );
 
 CREATE TABLE IF NOT EXISTS runs (
@@ -99,6 +101,7 @@ CREATE TABLE IF NOT EXISTS runs (
 MIGRATIONS = {
     "snapshots": [("fingerprint", "TEXT"), ("gap", "INTEGER")],
     "market": [("sold_per_day", "REAL"), ("tracked_h", "REAL")],
+    "items": [("icon", "TEXT"), ("icon_ts", "INTEGER")],
 }
 
 

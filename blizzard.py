@@ -100,14 +100,26 @@ class BlizzardAPI:
     def commodities(self, ruleset_id, house_id):
         return self.get(f"/data/wow/ruleset/{ruleset_id}/auctions/{house_id}/commodities", "dynamic-forever")
 
-    def item(self, item_id):
+    def _static(self, path, what):
         """Forever's item data is incomplete, so fall back to Classic Era's static namespace."""
         for ns in ("static-forever", "static-classic1x"):
             try:
-                data = self.get(f"/data/wow/item/{item_id}", ns)
+                data = self.get(path, ns)
             except BlizzardError as e:
-                log.debug("item %s in %s failed: %s", item_id, ns, e)
+                log.debug("%s in %s failed: %s", what, ns, e)
                 data = None
             if data:
                 return data
+        return None
+
+    def item(self, item_id):
+        return self._static(f"/data/wow/item/{item_id}", f"item {item_id}")
+
+    def item_icon(self, item_id):
+        """-> icon file name (e.g. 'inv_enchant_dustillusion'), or None."""
+        data = self._static(f"/data/wow/media/item/{item_id}", f"item media {item_id}") or {}
+        for a in data.get("assets") or []:
+            if a.get("key") == "icon" and a.get("value"):
+                # .../icons/56/inv_enchant_dustillusion.jpg -> inv_enchant_dustillusion
+                return a["value"].rsplit("/", 1)[-1].rsplit(".", 1)[0]
         return None

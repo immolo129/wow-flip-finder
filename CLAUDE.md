@@ -46,6 +46,7 @@ There are no tests. To check a change, run demo mode, which needs no API keys an
 - **Units.** All prices in the database, JSON and `flips.js` are integer copper per unit (1 g = 10 000 c). The page's filter boxes are in gold and whole percentages; `toCalc()` in `index.html` converts them to copper and fractions before calling `flips.js`.
 - **AH cut.** Faction houses take 5 % and the neutral Blackwater house takes 15 % (`FACTION_CUT`/`NEUTRAL_CUT` in `flips.js`). Profit figures already include the cut.
 - **Static site paths.** The page is served from a GitHub Pages subpath (`/<repo>/`), so `index.html` must use relative URLs (`data/latest.json`, not `/data/latest.json`).
+- **Item icons.** `items.icon` holds just the icon file name from Blizzard's item media endpoint (`'' ` = none found, retried weekly via `icon_ts`). The page builds the image URL itself: Blizzard's render server first, Wowhead's CDN as a backup, then a letter square (`itemIcon()` in `index.html`).
 - **Global names in `index.html`.** Scripts there are plain globals, so don't name functions after browser globals (`history`, `close`, `open`, `name`, `status`...). A function called `history` silently broke the price chart once.
 - **Testing the locked page headless.** Edge's `--virtual-time-budget` doesn't wait for the 600 000-round PBKDF2, so set `export.PBKDF2_ITER` low for browser tests.
 - **Database size on GitHub.** `cloud.py` keeps only 8 days (`KEEP_DAYS`) and VACUUMs before upload; the local app keeps 21.
