@@ -334,35 +334,40 @@ def _name(v):
 INDEX_NOTE = ""  # what the last item-list fetch did, for the run summary
 
 
-def fetch_item_index(db, api, force=False, max_pages=200):
+def fetch_item_index(db, api, force=False, max_chunks=120):
     """Every item in the item database (name, quality, vendor price), weekly. Tries Forever's own item
     search, then Classic Era's (Forever is built on it). -> items stored"""
     global INDEX_NOTE
     now = int(time.time())
-    last = db.one("SELECT value FROM meta WHERE key='items_index_v2_ts'")
+    last = db.one("SELECT value FROM meta WHERE key='items_index_v3_ts'")
     if not force and last and now - int(last["value"]) < INDEX_REFRESH_DAYS * 86400:
         INDEX_NOTE = "item list up to date"
         return 0
     rows, notes = {}, []
     for ns in ("static-forever", "static-classic1x"):
-        got, page = 0, 1
+        got, start = 0, 1
         try:
-            while page <= max_pages:
-                d = api.search_items(page, ns)
-                if not d:
-                    notes.append(f"{ns}: not found" if page == 1 else f"{ns}: stopped at page {page}")
+            for chunk in range(max_chunks):   # 1000 items per chunk, walking up by item id
+                d = api.search_items(start, ns)
+                results = (d or {}).get("results") or []
+                if not results:
+                    if chunk == 0:
+                        notes.append(f"{ns}: not found")
                     break
-                for res in d.get("results") or []:
+                top = start
+                for res in results:
                     it = res.get("data") or {}
+                    iid = it.get("id") or 0
+                    top = max(top, iid)
                     name = _name(it.get("name"))
-                    if not it.get("id") or not name or it["id"] in rows:
+                    if not iid or not name or iid in rows:
                         continue
                     q = it.get("quality") or {}
-                    rows[it["id"]] = (it["id"], name, q.get("type") if isinstance(q, dict) else None, it.get("sell_price") or 0, now)
+                    rows[iid] = (iid, name, q.get("type") if isinstance(q, dict) else None, it.get("sell_price") or 0, now)
                     got += 1
-                if page >= (d.get("pageCount") or 1):
+                if top < start:
                     break
-                page += 1
+                start = top + 1
         except Exception as e:
             notes.append(f"{ns}: {str(e)[:80]}")
         if got:
@@ -376,7 +381,7 @@ def fetch_item_index(db, api, force=False, max_pages=200):
                       ON CONFLICT(item_id) DO UPDATE SET name=excluded.name,
                         quality=COALESCE(excluded.quality, items.quality), sell_price=excluded.sell_price, found=1""",
                    list(rows.values()))
-    db.execute("INSERT OR REPLACE INTO meta VALUES ('items_index_v2_ts', ?)", (str(now),))
+    db.execute("INSERT OR REPLACE INTO meta VALUES ('items_index_v3_ts', ?)", (str(now),))
     return len(rows)
 
 

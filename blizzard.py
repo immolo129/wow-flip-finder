@@ -115,10 +115,11 @@ class BlizzardAPI:
     def item(self, item_id):
         return self._static(f"/data/wow/item/{item_id}", f"item {item_id}")
 
-    def search_items(self, page, namespace="static-forever", page_size=1000):
-        """One page of Blizzard's item search, ordered by id. -> {"pageCount": n, "results": [{"data": {...}}]}"""
+    def search_items(self, from_id, namespace="static-forever", page_size=1000):
+        """Up to page_size items with id >= from_id, ordered by id. Blizzard's search stops at 1000 results
+        per query, so callers walk the list by id. -> {"results": [{"data": {...}}], ...}"""
         return self.get("/data/wow/search/item", namespace,
-                        {"orderby": "id", "_page": page, "_pageSize": page_size})
+                        {"id": f"[{from_id},]", "orderby": "id", "_page": 1, "_pageSize": page_size})
 
     def item_icon(self, item_id):
         """-> icon file name (e.g. 'inv_enchant_dustillusion'), or None."""
