@@ -408,6 +408,8 @@
             <label data-for="reset arbitrage craft">Min ROI %<input type="number" id="f-min_roi" step="1" min="0"></label>
             <label data-for="reset">Buy below % of market<input type="number" id="f-buy_pct" step="1" min="10" max="100"></label>
             <label data-for="reset arbitrage craft">Min snapshots seen<input type="number" id="f-min_seen" step="1" min="1"></label>
+            <label data-for="craft" title="Reagents are priced by buying this many crafts' worth from the current listings, cheapest first">Crafts<input type="number" id="f-crafts" step="1" min="1"></label>
+            <label data-for="reset arbitrage craft" title="Deposit per listing as % of the item's vendor price. Used for Exp. profit: deposits lost on relists until it sells">Deposit % of vendor price<input type="number" id="f-deposit" step="1" min="0"></label>
             <label data-for="reset arbitrage">Min avg listings<input type="number" id="f-min_listings" step="1" min="0"></label>
             <label data-for="reset arbitrage" title="Don't buy more than sells in this many days (once sales have been tracked for 12 h)">Days to sell<input type="number" id="f-sell_days" step="0.5" min="0.5"></label>
             <label class="chk" data-for="arbitrage"><input type="checkbox" id="f-include_alt"> Include routes that need an alt on the other faction</label>
@@ -450,10 +452,10 @@
 <script src="flips.js"></script>
 <script>
 const DEFAULTS = {
-  reset:     { min_profit: 0.5, min_roi: 15, buy_pct: 80, min_seen: 3, min_listings: 2, sell_days: 2 },
-  arbitrage: { min_profit: 0.5, min_roi: 20, min_seen: 3, min_listings: 2, sell_days: 2 },
+  reset:     { min_profit: 0.5, min_roi: 15, buy_pct: 80, min_seen: 3, min_listings: 2, sell_days: 2, deposit: 15 },
+  arbitrage: { min_profit: 0.5, min_roi: 20, min_seen: 3, min_listings: 2, sell_days: 2, deposit: 15 },
   vendor:    { min_profit: 0.01 },
-  craft:     { min_profit: 0.5, min_roi: 10, min_seen: 3 },
+  craft:     { min_profit: 0.5, min_roi: 10, min_seen: 3, crafts: 1, deposit: 15 },
 };
 const PAGES = {
   reset: { title: "Underpriced", tag: "Underpriced", icon: "i-reset",
@@ -469,13 +471,13 @@ const COLS = {
   reset: [
     ["name", "Item", "item"], ["house", "House", "l"], ["below", "Below market", "below"], ["buy_units", "Units"],
     ["buy_upto", "Buy up to", "m"], ["cost", "Cost", "m"], ["sell_at", "Sell at", "m"], ["profit", "Profit", "m p"],
-    ["roi", "ROI", "r"], ["sells_day", "Sells/day", "v"], ["sell_rate", "Sell rate", "pct"], ["chg24", "24h", "chg"],
+    ["roi", "ROI", "r"], ["exp_profit", "Exp. profit", "m e"], ["sells_day", "Sells/day", "v"], ["sell_rate", "Sell rate", "pct"], ["chg24", "24h", "chg"],
     ["region", "Region", "m"], ["confidence", "Data", "conf"],
   ],
   arbitrage: [
     ["name", "Item", "item"], ["buy_house", "Buy in", "l"], ["sell_house", "Sell in", "l"], ["buy_units", "Units"],
     ["buy_upto", "Buy up to", "m"], ["cost", "Cost", "m"], ["sell_at", "Sell at", "m"], ["profit", "Profit", "m p"],
-    ["roi", "ROI", "r"], ["sells_day", "Sells/day", "v"], ["sell_rate", "Sell rate", "pct"], ["route", "Route", "route"], ["confidence", "Data", "conf"],
+    ["roi", "ROI", "r"], ["exp_profit", "Exp. profit", "m e"], ["sells_day", "Sells/day", "v"], ["sell_rate", "Sell rate", "pct"], ["route", "Route", "route"], ["confidence", "Data", "conf"],
   ],
   vendor: [
     ["name", "Item", "item"], ["house", "House", "l"], ["buy_units", "Units"], ["buy_upto", "Buy up to", "m"],
@@ -483,7 +485,7 @@ const COLS = {
   ],
   craft: [
     ["name", "Crafted item", "item"], ["profession", "Profession", "l"], ["house", "Sell in", "l"], ["cost", "Reagent cost", "m"],
-    ["sell_at", "Sells for", "m"], ["region", "Region", "m"], ["profit", "Profit", "m p"], ["roi", "ROI", "r"], ["sells_day", "Sells/day", "v"],
+    ["sell_at", "Sells for", "m"], ["region", "Region", "m"], ["profit", "Profit", "m p"], ["roi", "ROI", "r"], ["exp_profit", "Exp. profit", "m e"], ["sells_day", "Sells/day", "v"],
     ["sell_rate", "Sell rate", "pct"], ["confidence", "Data", "conf"],
   ],
 };
@@ -522,7 +524,7 @@ function savedFilters(k) {
 function filtersFor(k) { return { ...DEFAULTS[k], ...savedFilters(k) }; }
 function loadFilters() {
   const f = filtersFor(kind);
-  for (const k of ["min_profit", "min_roi", "buy_pct", "min_seen", "min_listings", "sell_days"]) if (f[k] !== undefined) $("f-" + k).value = f[k];
+  for (const k of ["min_profit", "min_roi", "buy_pct", "min_seen", "min_listings", "sell_days", "crafts", "deposit"]) if (f[k] !== undefined) $("f-" + k).value = f[k];
   $("f-include_alt").checked = !!f.include_alt;
   document.querySelectorAll("#filters [data-for]").forEach((el) => {
     el.style.display = el.dataset.for.split(" ").includes(kind) ? "" : "none";
@@ -543,6 +545,7 @@ function toCalc(k, f) {
     min_roi: (num("min_roi") || 0) / 100, buy_pct: (num("buy_pct") || 80) / 100,
     min_seen: num("min_seen") || 1, min_listings: num("min_listings") || 0, sell_days: num("sell_days") || 0,
     include_alt: !!f.include_alt, profession: f.profession || "",
+    crafts: Math.max(1, Math.round(num("crafts") || 1)), deposit: Math.max(0, num("deposit") ?? 15) / 100,
   };
 }
 // Sidebar: one entry per profession that has recipes, with its number of profitable recipes.
@@ -572,8 +575,22 @@ function statsFor(hid, iid) {
     days_supply: spd ? units / spd : null, region: reg ? reg[0] : null, region_now: reg ? reg[1] : null, region_houses: reg ? reg[2] : null,
   };
 }
-const compute = (k, f) => FLIPS[k](D, toCalc(k, f), faction()).map((r) => ({ ...statsFor(r.house_id, r.item_id), ...r, kind: k,
-  below: r.market && r.buy_upto ? 1 - r.buy_upto / r.market : null }));
+// Profit minus the deposits you'd expect to lose relisting until it sells. With sell rate s, an
+// average sale takes 1/s listings, so (1 - s)/s of them expire and lose their deposit.
+function expectedProfit(r, deposit) {
+  if (r.kind === "vendor" || r.sell_rate == null) return null;
+  const s = Math.max(r.sell_rate, 0.05), units = r.kind === "craft" ? r.crafted_qty : r.buy_units;
+  const perListing = (itemOf(D, r.item_id).vendor || 0) * deposit;
+  return r.profit - units * perListing * (1 - s) / s;
+}
+const compute = (k, f) => {
+  const c = toCalc(k, f);
+  return FLIPS[k](D, c, faction()).map((r) => {
+    const row = { ...statsFor(r.house_id, r.item_id), ...r, kind: k, below: r.market && r.buy_upto ? 1 - r.buy_upto / r.market : null };
+    row.exp_profit = expectedProfit(row, c.deposit);
+    return row;
+  });
+};
 
 // ---------- password lock ----------
 // On GitHub the data files are encrypted (see export.py). The key is derived from the
@@ -765,7 +782,8 @@ function reagentTable(r) {
       `<td>${money(p.price * p.qty)}</td></tr>`;
   }).join("");
   const made = r.crafted_qty !== 1 ? ` (makes ${r.crafted_qty})` : "";
-  return `<div class="reagents"><div class="rhd"><b>${esc(r.recipe)}</b> · ${esc(r.profession)}${made}</div>` +
+  const per = r.crafts > 1 ? ` · prices from buying ${r.crafts} crafts' worth, per craft` : "";
+  return `<div class="reagents"><div class="rhd"><b>${esc(r.recipe)}</b> · ${esc(r.profession)}${made}${per}</div>` +
     `<table><thead><tr><th class="l">Reagent</th><th>Need</th><th>Price each</th><th class="l">Cheapest at</th><th>Cost</th></tr></thead>` +
     `<tbody>${rows}<tr class="sum"><td class="l" colspan="4">Total reagent cost</td><td>${money(r.cost)}</td></tr>` +
     `<tr class="sum"><td class="l" colspan="4">Sells for, after the ${esc(short(r.house))} AH cut</td><td>${money(r.cost + r.profit)}</td></tr>` +
@@ -868,7 +886,9 @@ function renderPage() {
   tb.innerHTML = list.map((r, i) => "<tr data-i='" + i + "'>" + cols.map(([k, , t]) => {
     const v = r[k];
     if (t === "item") return itemCell(r);
-    if ((t || "").startsWith("m")) return `<td class="${t.includes("p") ? "profit" : ""}">${money(v)}</td>`;
+    if (t === "m e") return v == null ? `<td class="muted" title="Needs the sell rate (12 h of sales tracking)">–</td>`
+      : `<td title="Profit minus the deposits you'd expect to lose relisting until it sells" style="${v < 0 ? "color:var(--bad)" : ""}">${money(v)}</td>`;
+    if ((t || "").startsWith("m")) return v == null ? `<td class="muted">–</td>` : `<td class="${t.includes("p") ? "profit" : ""}">${money(v)}</td>`;
     if (t === "r") return `<td class="roi">${Math.round(v * 100)}%</td>`;
     if (t === "below") return v == null ? "<td class='muted'>–</td>" :
       `<td><span class="below">${Math.round(v * 100)}%<span class="bar"><i style="width:${Math.min(100, Math.max(4, v * 100))}%"></i></span></span></td>`;
@@ -957,7 +977,8 @@ async function renderItem() {
       : r.kind === "craft" ? `Craft with <b>${esc(r.profession)}</b> (${esc(r.recipe)}): reagents ${money(r.cost)}, sell in ${esc(short(r.house))} at ${money(r.sell_at)}`
       : r.kind === "vendor" ? `Buy <b>${r.buy_units}</b> up to ${money(r.buy_upto)} and sell to a vendor for ${money(r.sell_at)}`
       : `Buy <b>${r.buy_units}</b> up to ${money(r.buy_upto)}, relist at ${money(r.sell_at)}`) +
-    ` → profit <b class="profit">${money(r.profit)}</b> <span class="roi">(${Math.round(r.roi * 100)}%)</span>` : "";
+    ` → profit <b class="profit">${money(r.profit)}</b> <span class="roi">(${Math.round(r.roi * 100)}%)</span>` +
+    (r.exp_profit != null ? ` · <span title="After the deposits you'd expect to lose relisting until it sells">expected ${money(r.exp_profit)}</span>` : "") : "";
   const listed = itemHouses(r.item_id).some((h) => D.ladders.has(h.id + ":" + r.item_id));
   const note = !fl && !listed ? `<span class="tag" style="background:var(--panel2);color:var(--muted)">Not listed</span> ` +
     `Nobody is selling this on the auction house right now.${D.region[r.item_id] ? " The region price shows what it goes for on other servers." : ""}` : "";

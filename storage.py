@@ -50,7 +50,8 @@ CREATE TABLE IF NOT EXISTS prev_auctions (
     auction_id INTEGER,
     item_id    INTEGER,
     quantity   INTEGER,
-    time_left  TEXT
+    time_left  TEXT,
+    unit_price INTEGER
 );
 CREATE INDEX IF NOT EXISTS ix_prev ON prev_auctions (ruleset, house_id);
 
@@ -148,6 +149,7 @@ MIGRATIONS = {
     "market": [("sold_per_day", "REAL"), ("tracked_h", "REAL"), ("sell_rate", "REAL"), ("low7", "INTEGER"),
                ("avg7", "INTEGER"), ("high7", "INTEGER"), ("chg24", "REAL"), ("chg7", "REAL")],
     "sales": [("gone", "INTEGER")],
+    "prev_auctions": [("unit_price", "INTEGER")],
     "items": [("icon", "TEXT"), ("icon_ts", "INTEGER"), ("vendor_buy", "INTEGER")],
 }
 

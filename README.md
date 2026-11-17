@@ -115,6 +115,17 @@ Blizzard once a week.
 | 7-day range / average | Lowest, highest and average market value over the last week |
 | Region price | Median market value across every auction house of every Forever server type (PvP, Normal, RP, RP-PvP), like TSM's region values |
 
+**How the numbers are kept honest:**
+
+- *Bait listings* far below or above an item's typical price don't move its market value (cheap ones still show as flips).
+- *Cancel-and-relist* isn't counted as a sale: if an auction vanished while a cheaper one of the same item stayed up,
+  it was cancelled, not bought.
+- *Crafting* prices reagents by buying from the actual listings, cheapest first. Set **Crafts** (under Filters) to how
+  many you plan to make: buying for 40 crafts costs more per craft than buying for 1.
+- *Exp. profit* subtracts the listing deposits you'd expect to lose relisting until it sells, using the sell rate.
+  **Deposit % of vendor price** (under Filters, default 15) is an estimate; adjust it if Forever's deposits differ.
+- Snapshots are dated by when Blizzard generated the data, not when it was fetched.
+
 If Blizzard hasn't updated an auction house since the last fetch, that data is
 skipped instead of being saved twice.
 

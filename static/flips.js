@@ -173,24 +173,33 @@ function vendorFlips(D, f, faction) {
   return out.sort((a, b) => b.profit - a.profit);
 }
 
-// Cheapest place to get one unit of a reagent: a vendor (known vendor reagents only) or the
-// market value in any house this character can use. -> { price, source, house_id } or null
-function reagentPrice(D, iid, faction, minSeen) {
+// Cheapest way to buy n units of a reagent right now: from a vendor (known vendor reagents only), or by
+// buying the cheapest listings of one auction house this character can use, walking up its price ladder.
+// -> { total, price (average per unit), source, house_id } or null if no house has enough listed
+function reagentCost(D, iid, n, faction) {
   const it = itemOf(D, iid);
-  let best = it.vendor_buy ? { price: it.vendor_buy, source: "Vendor", house_id: null } : null;
+  let best = it.vendor_buy ? { total: it.vendor_buy * n, source: "Vendor", house_id: null } : null;
   for (const h of D.houses.values()) {
     if (!accessible(h, faction)) continue;
-    const m = D.markets.get(h.id + ":" + iid);
-    if (!m || m.seen < minSeen) continue;
-    if (!best || m.market < best.price) best = { price: m.market, source: h.name, house_id: h.id };
+    const lad = D.ladders.get(h.id + ":" + iid);
+    if (!lad) continue;
+    let need = n, total = 0;
+    for (const [price, qty] of lad) {
+      const take = Math.min(qty, need);
+      total += take * price; need -= take;
+      if (!need) break;
+    }
+    if (need > 0) continue; // not enough listed here
+    if (!best || total < best.total) best = { total, source: h.name, house_id: h.id };
   }
-  return best;
+  return best && { ...best, price: best.total / n };
 }
 
-// Crafting: buy the reagents (cheapest source each), craft, sell the result at its market value
-// in the best house this character can use, after the AH cut.
-// f.profession filters to one profession ("" = all).
+// Crafting: buy the reagents for f.crafts crafts (cheapest source each, real listings), craft, sell the
+// result at its market value in the best house this character can use, after the AH cut.
+// Numbers are per craft. f.profession filters to one profession ("" = all).
 function craftFlips(D, f, faction) {
+  const crafts = Math.max(1, Math.round(f.crafts || 1));
   const out = [];
   for (const [rid, recipe, profession, made, qty, reagents] of D.recipes) {
     if (f.profession && profession !== f.profession) continue;
@@ -205,16 +214,16 @@ function craftFlips(D, f, faction) {
     if (!sell) continue;
     let cost = 0, missing = false;
     const parts = reagents.map(([iid, n]) => {
-      const p = reagentPrice(D, iid, faction, f.min_seen);
-      if (!p) missing = true; else cost += p.price * n;
-      return { ...itemOf(D, iid), qty: n, price: p ? p.price : null, source: p ? p.source : null };
+      const c = reagentCost(D, iid, n * crafts, faction);
+      if (!c) missing = true; else cost += c.total / crafts;
+      return { ...itemOf(D, iid), qty: n, price: c ? c.price : null, source: c ? c.source : null };
     });
-    if (missing || cost <= 0) continue; // a reagent with no price: profit unknown
+    if (missing || cost <= 0) continue; // a reagent can't be bought in that amount: profit unknown
     const profit = sell.net - cost, roi = profit / cost;
     if (profit < f.min_profit || roi < f.min_roi) continue;
     out.push({
       ...itemOf(D, made), recipe_id: rid, recipe, profession, house: sell.h.name, house_id: sell.h.id,
-      crafted_qty: qty, cost, sell_at: sell.m.market, profit, roi, parts, seen: sell.m.seen,
+      crafted_qty: qty, crafts, cost, sell_at: sell.m.market, profit, roi, parts, seen: sell.m.seen,
       sells_day: round1(sellsDay(sell.m)), confidence: confidenceOf(sell.m.seen),
     });
   }

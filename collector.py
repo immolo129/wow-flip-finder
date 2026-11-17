@@ -13,7 +13,9 @@ log = logging.getLogger("collector")
 # Auctions that had LONG (2-12 h) or VERY_LONG time left can't expire within one gap, so
 # those count as sold. Cancellations still count too, so treat sales as an estimate.
 SAFE_TIME_LEFT = {"LONG", "VERY_LONG"}
-MAX_GAP = int(2.5 * 3600)   # longer gaps between snapshots can't tell sales from expiries
+MAX_GAP = int(2.5 * 3600)
+BAIT_LOW, BAIT_HIGH = 0.2, 5.0   # market value ignores listings below 20 % or above 5x the median price
+CANCEL_MARGIN = 0.99             # a vanished auction this much pricier than one that stayed was cancelled   # longer gaps between snapshots can't tell sales from expiries
 
 
 def is_neutral(name):
@@ -62,11 +64,14 @@ def summarize(ladder):
         if cum >= half:
             median = p
             break
-    # market = weighted mean of the cheapest 25 % of units (TSM-style)
-    want = max(1, math.ceil(total * 0.25))
+    # market = weighted mean of the cheapest 25 % of units (TSM-style), ignoring bait listings far
+    # below or above the typical price (the cheap ones still show up as flips; they're in the ladder)
+    core = [(p, q) for p, q in ladder if median * BAIT_LOW <= p <= median * BAIT_HIGH] or ladder
+    total_core = sum(q for _, q in core)
+    want = max(1, math.ceil(total_core * 0.25))
     took = 0
     acc = 0
-    for p, q in ladder:
+    for p, q in core:
         take = min(q, want - took)
         acc += p * take
         took += take
@@ -87,17 +92,27 @@ def estimate_sales(db, ruleset, house_id, auctions):
     -> {item_id: (units sold, all units that left)}, or None if it can't tell.
     'Sold' counts only auctions that vanished while they still had hours left, so it's a low estimate;
     'left' also counts the ones that may have expired. sold / left is the sell rate."""
-    if not any(tl for *_, tl in auctions):
+    if not any(a[3] for a in auctions):
         return None  # no time_left in the data: can't separate sales from expiries
-    prev = db.query("SELECT auction_id, item_id, quantity, time_left FROM prev_auctions WHERE ruleset=? AND house_id=?",
+    prev = db.query("SELECT auction_id, item_id, quantity, time_left, unit_price FROM prev_auctions WHERE ruleset=? AND house_id=?",
                     (ruleset, house_id))
     if not prev:
         return None
-    now = {aid: qty for aid, _, qty, _ in auctions if aid is not None}
+    now = {a[0]: a[2] for a in auctions if a[0] is not None}
+    # Buyers take the cheapest listing first. If an auction vanished while a cheaper one of the same
+    # item stayed up, it was almost certainly cancelled (often to relist lower), not bought.
+    cheapest_kept = {}
+    for p in prev:
+        if p["auction_id"] in now and p["unit_price"]:
+            i = p["item_id"]
+            cheapest_kept[i] = min(cheapest_kept.get(i, p["unit_price"]), p["unit_price"])
     sold, gone = defaultdict(int), defaultdict(int)
     for p in prev:
         q = now.get(p["auction_id"])
         if q is None:
+            kept = cheapest_kept.get(p["item_id"])
+            if kept is not None and p["unit_price"] and kept < p["unit_price"] * CANCEL_MARGIN:
+                continue  # cancelled: neither sold nor expired
             gone[p["item_id"]] += p["quantity"]
             if p["time_left"] in SAFE_TIME_LEFT:
                 sold[p["item_id"]] += p["quantity"]
@@ -110,7 +125,7 @@ def estimate_sales(db, ruleset, house_id, auctions):
 # ---------- storing ----------
 def store_snapshot(db, ruleset, house_id, listings, ts=None, auctions=None, sales=None, fp=None):
     """listings: list of (item_id, unit_price, quantity), one entry per auction.
-    auctions: optional (auction_id, item_id, quantity, time_left) per auction, used to estimate sales.
+    auctions: optional (auction_id, item_id, quantity, time_left, unit_price) per auction, used to estimate sales.
     sales:    optional {item_id: (units sold, units that left)} since the previous snapshot, if already known (demo).
     fp:       fingerprint of the data; if it matches the house's last snapshot nothing is stored.
     Returns the snapshot id, or None when the data hasn't changed."""
@@ -158,8 +173,10 @@ def store_snapshot(db, ruleset, house_id, listings, ts=None, auctions=None, sale
                            [(sid, i, sg[0], sg[1]) for i, sg in sales.items() if sg[0] > 0 or sg[1] > 0])
         if auctions is not None:
             db.execute("DELETE FROM prev_auctions WHERE ruleset=? AND house_id=?", (ruleset, house_id))
-            db.executemany("INSERT INTO prev_auctions VALUES (?,?,?,?,?,?)",
-                           [(ruleset, house_id, aid, iid, qty, tl) for aid, iid, qty, tl in auctions if aid is not None])
+            db.executemany("""INSERT INTO prev_auctions (ruleset, house_id, auction_id, item_id, quantity, time_left, unit_price)
+                              VALUES (?,?,?,?,?,?,?)""",
+                           [(ruleset, house_id, a[0], a[1], a[2], a[3], a[4] if len(a) > 4 else None)
+                            for a in auctions if a[0] is not None])
     return sid
 
 
@@ -476,8 +493,16 @@ def fetch_vendor_prices(db, api):
 
 # ---------- one full run ----------
 def fetch_house(api, ruleset, hid):
-    """All buyout listings of one auction house. -> [(auction_id, item_id, unit_price, quantity, time_left)]"""
+    """All buyout listings of one auction house.
+    -> ([(auction_id, item_id, unit_price, quantity, time_left)], Blizzard's Last-Modified time or None)"""
+    stamps = []
+
+    def stamp():
+        if getattr(api, "last_modified", None):
+            stamps.append(api.last_modified)
+
     data = api.house(ruleset, hid) or {}
+    stamp()
     seen_ids, parsed = set(), []
 
     def add(auctions):
@@ -497,24 +522,29 @@ def fetch_house(api, ruleset, hid):
             got_commodities |= key == "commodities"
         elif isinstance(v, dict) and v.get("href"):
             sub = api.get(v["href"], "dynamic-forever") or {}
+            stamp()
             add(sub.get("auctions"))
             got_commodities |= key == "commodities"
     if not got_commodities:
         sub = api.commodities(ruleset, hid) or {}
+        stamp()
         add(sub.get("auctions"))
-    return parsed
+    return parsed, (max(stamps) if stamps else None)
 
 
 def collect_house(db, api, ruleset, hid):
     """Fetch and store one auction house. -> (listings, stored?, parsed listings)"""
-    parsed = fetch_house(api, ruleset, hid)
+    parsed, data_ts = fetch_house(api, ruleset, hid)
     if not parsed:
         return 0, False, parsed
+    # date the snapshot by when Blizzard generated the data, if that looks sane
+    now = int(time.time())
+    ts = data_ts if data_ts and now - 6 * 3600 <= data_ts <= now + 300 else now
     sid = store_snapshot(
         db, ruleset, hid,
         listings=[(iid, up, qty) for _, iid, up, qty, _ in parsed],
-        auctions=[(aid, iid, qty, tl) for aid, iid, _, qty, tl in parsed],
-        fp=fingerprint(parsed),
+        auctions=[(aid, iid, qty, tl, up) for aid, iid, up, qty, tl in parsed],
+        ts=ts, fp=fingerprint(parsed),
     )
     return len(parsed), sid is not None, parsed
 
@@ -556,7 +586,7 @@ def collect_region(db, api, own_ruleset, own):
             continue
         for h in houses:
             try:
-                per_house[(rs, h["id"])] = _ladders(fetch_house(api, rs, h["id"]))
+                per_house[(rs, h["id"])] = _ladders(fetch_house(api, rs, h["id"])[0])
             except Exception as e:
                 problems.append(f"ruleset {rs} house {h.get('id')}: {e}")
     if per_house:

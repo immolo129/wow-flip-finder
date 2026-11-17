@@ -10,6 +10,7 @@ community confirmed after launch (Nov 2026):
 """
 import time
 import logging
+from email.utils import parsedate_to_datetime
 
 import requests
 
@@ -35,6 +36,7 @@ class BlizzardAPI:
         self.session = requests.Session()
         self._token = None
         self._token_exp = 0
+        self.last_modified = None  # Blizzard's Last-Modified of the latest response, epoch seconds
 
     # ---------- auth ----------
     def _get_token(self):
@@ -64,6 +66,7 @@ class BlizzardAPI:
             url = self.base + path_or_url
         params = {"namespace": f"{namespace}-{self.region}", "locale": self.locale, **(extra or {})}
         last = None
+        self.last_modified = None
         for attempt in range(5):
             headers = {"Authorization": f"Bearer {self._get_token()}"}
             try:
@@ -84,6 +87,10 @@ class BlizzardAPI:
             if r.status_code == 403:
                 raise BlizzardError(f"403 Forbidden on {url} (namespace {params['namespace']})")
             r.raise_for_status()
+            try:
+                self.last_modified = int(parsedate_to_datetime(r.headers['Last-Modified']).timestamp())
+            except Exception:
+                self.last_modified = None
             return r.json()
         raise BlizzardError(f"Giving up on {url}: {last}")
 
