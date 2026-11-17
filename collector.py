@@ -339,7 +339,7 @@ def fetch_item_index(db, api, force=False, max_pages=200):
     search, then Classic Era's (Forever is built on it). -> items stored"""
     global INDEX_NOTE
     now = int(time.time())
-    last = db.one("SELECT value FROM meta WHERE key='items_index_ts'")
+    last = db.one("SELECT value FROM meta WHERE key='items_index_v2_ts'")
     if not force and last and now - int(last["value"]) < INDEX_REFRESH_DAYS * 86400:
         INDEX_NOTE = "item list up to date"
         return 0
@@ -376,7 +376,7 @@ def fetch_item_index(db, api, force=False, max_pages=200):
                       ON CONFLICT(item_id) DO UPDATE SET name=excluded.name,
                         quality=COALESCE(excluded.quality, items.quality), sell_price=excluded.sell_price, found=1""",
                    list(rows.values()))
-    db.execute("INSERT OR REPLACE INTO meta VALUES ('items_index_ts', ?)", (str(now),))
+    db.execute("INSERT OR REPLACE INTO meta VALUES ('items_index_v2_ts', ?)", (str(now),))
     return len(rows)
 
 
