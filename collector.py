@@ -294,13 +294,13 @@ def fetch_missing_items(db, api, max_items=3000):
 
 
 def fetch_missing_icons(db, api, max_items=3000):
-    """Look up icons for listed items and recipe items that don't have one yet; retry missing ones weekly."""
+    """Look up icons for items that don't have one yet (listed and recipe items first); retry missing ones weekly."""
     now = int(time.time())
     ids = [r["item_id"] for r in db.query(
         """SELECT item_id FROM items
            WHERE (icon IS NULL OR (icon = '' AND icon_ts < ?))
-             AND item_id IN (SELECT item_id FROM latest_listings UNION SELECT crafted_item FROM recipes
-                             UNION SELECT item_id FROM recipe_reagents)
+           ORDER BY item_id IN (SELECT item_id FROM latest_listings UNION SELECT crafted_item FROM recipes
+                                UNION SELECT item_id FROM recipe_reagents) DESC
            LIMIT ?""",
         (now - 7 * 86400, max_items))]
     if not ids:
@@ -318,6 +318,49 @@ def fetch_missing_icons(db, api, max_items=3000):
         rows = list(ex.map(one, ids))
     db.executemany("UPDATE items SET icon=?, icon_ts=? WHERE item_id=?", rows)
     return sum(1 for icon, _, _ in rows if icon)
+
+
+# ---------- full item list (for searching every item) ----------
+INDEX_REFRESH_DAYS = 7
+
+
+def _name(v):
+    """Item search returns names per language ({"en_GB": ...}) unless one locale is asked for."""
+    if isinstance(v, dict):
+        return v.get("en_GB") or v.get("en_US") or next(iter(v.values()), None)
+    return v
+
+
+def fetch_item_index(db, api, force=False, max_pages=200):
+    """Every item in Forever's item database (name, quality, vendor price), weekly. -> items stored"""
+    now = int(time.time())
+    last = db.one("SELECT value FROM meta WHERE key='items_index_ts'")
+    if not force and last and now - int(last["value"]) < INDEX_REFRESH_DAYS * 86400:
+        return 0
+    rows, page = [], 1
+    while page <= max_pages:
+        d = api.search_items(page)
+        if not d:
+            break
+        for res in d.get("results") or []:
+            it = res.get("data") or {}
+            name = _name(it.get("name"))
+            if not it.get("id") or not name:
+                continue
+            q = it.get("quality") or {}
+            rows.append((it["id"], name, q.get("type") if isinstance(q, dict) else None, it.get("sell_price") or 0, now))
+        if page >= (d.get("pageCount") or 1):
+            break
+        page += 1
+    if not rows:
+        log.warning("Item search returned nothing; searching covers known items only")
+        return 0
+    # upsert: keeps icons and vendor prices; names from the search count as found items
+    db.executemany("""INSERT INTO items (item_id, name, quality, sell_price, found, fetched_ts) VALUES (?,?,?,?,1,?)
+                      ON CONFLICT(item_id) DO UPDATE SET name=excluded.name,
+                        quality=COALESCE(excluded.quality, items.quality), sell_price=excluded.sell_price, found=1""", rows)
+    db.execute("INSERT OR REPLACE INTO meta VALUES ('items_index_ts', ?)", (str(now),))
+    return len(rows)
 
 
 # ---------- crafting ----------
@@ -546,6 +589,11 @@ def collect(db, api, ruleset, keep_days=21, region=True):
     except Exception as e:
         log.exception("Fetching recipes failed")
         n_recipes, errors = 0, errors + [f"recipes: {e}"]
+    try:  # the full item list for searching is extra too
+        n_index = fetch_item_index(db, api)
+    except Exception:
+        log.exception("Item search failed")
+        n_index = 0
     n_items = fetch_missing_items(db, api)
     fetch_vendor_prices(db, api)
     n_icons = fetch_missing_icons(db, api)
@@ -553,6 +601,8 @@ def collect(db, api, ruleset, keep_days=21, region=True):
     msg = f"{len(houses)} houses, {total} listings, {n_items} new item names, {n_icons} new icons{region_msg}, {time.time() - t0:.0f}s"
     if n_recipes:
         msg += f", {n_recipes} recipes refreshed"
+    if n_index:
+        msg += f", item list refreshed ({n_index} items)"
     if unchanged:
         msg += f"; unchanged: {', '.join(unchanged)}"
     if errors:

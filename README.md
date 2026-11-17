@@ -101,6 +101,10 @@ the item name for the AH search box.
 snapshots while they still had 2+ hours left. Cancelled auctions count as sales
 too, so it reads a bit high for items that people repost a lot.
 
+**Search** any item in the game with the box at the top: it suggests matches as you type, with the price if it's
+on the auction house. Pick one (or press Enter) to open its item view. The full item list comes from
+Blizzard once a week.
+
 **More stats** (columns and the item view; click an item, then Details):
 
 | Stat | Meaning |

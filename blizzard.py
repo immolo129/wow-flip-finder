@@ -56,13 +56,13 @@ class BlizzardAPI:
         return self._token
 
     # ---------- generic GET ----------
-    def get(self, path_or_url, namespace):
+    def get(self, path_or_url, namespace, extra=None):
         """GET a path or full href. Returns parsed JSON, or None on 404."""
         if path_or_url.startswith("http"):
             url = path_or_url.split("?")[0]
         else:
             url = self.base + path_or_url
-        params = {"namespace": f"{namespace}-{self.region}", "locale": self.locale}
+        params = {"namespace": f"{namespace}-{self.region}", "locale": self.locale, **(extra or {})}
         last = None
         for attempt in range(5):
             headers = {"Authorization": f"Bearer {self._get_token()}"}
@@ -114,6 +114,11 @@ class BlizzardAPI:
 
     def item(self, item_id):
         return self._static(f"/data/wow/item/{item_id}", f"item {item_id}")
+
+    def search_items(self, page, page_size=1000):
+        """One page of Blizzard's item search, ordered by id. -> {"pageCount": n, "results": [{"data": {...}}]}"""
+        return self.get("/data/wow/search/item", "static-forever",
+                        {"orderby": "id", "_page": page, "_pageSize": page_size})
 
     def item_icon(self, item_id):
         """-> icon file name (e.g. 'inv_enchant_dustillusion'), or None."""

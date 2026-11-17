@@ -66,6 +66,11 @@ def latest():
     return jsonify(export.latest(db, CFG, STATE))
 
 
+@app.route("/data/items.json")
+def items():
+    return jsonify(export.item_index(db))
+
+
 @app.route("/data/history/<int:shard>.json")
 def history(shard):
     if not 0 <= shard < export.SHARDS:

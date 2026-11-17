@@ -105,6 +105,14 @@ def latest(db, cfg, extra=None):
     }
 
 
+def item_index(db):
+    """Every item with a name, for the search box: id -> [name, quality, icon, vendor sell price].
+    Its own file (data/items.json) so it only loads when someone searches."""
+    return {str(r["item_id"]): [r["name"], (r["quality"] or "").lower(), r["icon"] or "", r["sell_price"] or 0]
+            for r in db.query("SELECT item_id, name, quality, icon, sell_price FROM items WHERE name IS NOT NULL")
+            if not r["name"].startswith("Item ")}
+
+
 def _history_rows(db, ruleset, shard=None, days=HISTORY_DAYS):
     sql = """SELECT s.house_id, st.item_id, s.ts, st.min_price, st.market, st.quantity
              FROM item_stats st JOIN snapshots s ON s.id = st.snapshot_id
@@ -146,6 +154,8 @@ def write_site(db, cfg, out_dir, static_dir, extra=None, password=None, site_id=
     (out / "data" / "history").mkdir(parents=True)
     data = latest(db, cfg, extra)
     dump(data, out / "data" / "latest.json")
+    index = item_index(db)
+    dump(index, out / "data" / "items.json")
     shards = _group(_history_rows(db, cfg["ruleset"]))
     for k in range(SHARDS):
         dump(shards.get(k, {}), out / "data" / "history" / f"{k}.json")
@@ -154,6 +164,6 @@ def write_site(db, cfg, out_dir, static_dir, extra=None, password=None, site_id=
     return {"houses": len(data["houses"]), "items listed": len(data["ladders"]),
             "recipes": len(data["recipes"]), "professions": len({r[2] for r in data["recipes"]}),
             "icons": sum(1 for it in data["items"].values() if it[3]), "items": len(data["items"]),
-            "region prices": len(data["region"]), "sell rates": sum(1 for m in data["markets"] if m[8] is not None),
+            "searchable items": len(index), "region prices": len(data["region"]), "sell rates": sum(1 for m in data["markets"] if m[8] is not None),
             "hours of sales tracking": max((m[7] for m in data["markets"]), default=0),
             "snapshots": (data["status"]["snapshots"] or {}).get("n") or 0}

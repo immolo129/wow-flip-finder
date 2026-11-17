@@ -61,7 +61,8 @@
   .topbar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 24px;
             background: rgba(9, 9, 11, .88); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
   .menubtn { display: none; background: none; border: 1px solid var(--line); border-radius: 8px; padding: 6px; }
-  .search { flex: 1; max-width: 560px; display: flex; align-items: center; gap: 8px; background: var(--panel);
+  .searchwrap { position: relative; flex: 1; max-width: 560px; }
+  .search { display: flex; align-items: center; gap: 8px; background: var(--panel);
             border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; color: var(--muted); }
   .search:focus-within { border-color: var(--line2); }
   .search input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; color: var(--text); font: inherit; padding: 9px 0; }
@@ -166,12 +167,14 @@
   .dhead .nm { font: 700 21px/1.25 var(--head); }
   .dhead .links { display: flex; gap: 6px; margin-top: 6px; }
   .dhead .x { margin-left: auto; align-self: flex-start; padding: 6px 11px; }
+  .dflip.muted { background: var(--panel2); border-color: var(--line); color: var(--muted); }
   .dflip { margin-top: 16px; padding: 12px 14px; border-radius: 10px; background: var(--accent-soft); border: 1px solid rgba(242, 184, 29, .25); line-height: 1.7; }
   .dstats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
   .dstats div { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
   .dstats > div > span { display: block; color: var(--muted); font-size: 12px; }
   .dstats b { display: block; font: 600 15px/1.4 var(--head); margin-top: 2px; }
   .dstats small { color: var(--dim); font: 400 11px var(--body); }
+  .seg:empty { display: none; }
   .dctl { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 20px 0 10px; }
   .chartbox { position: relative; }
   #pc { width: 100%; height: 280px; display: block; cursor: crosshair; }
@@ -280,7 +283,18 @@
     .summary .card { padding: 10px 12px; }
     .summary .v { font-size: 15px; }
   }
-  @media (max-width: 520px) { .search { order: 3; flex-basis: 100%; max-width: none; } .topinfo { margin-left: auto; } }
+  .suggest { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 30; background: var(--panel); border: 1px solid var(--line2);
+             border-radius: 12px; box-shadow: 0 16px 40px rgba(0, 0, 0, .55); overflow: hidden; max-height: 70vh; overflow-y: auto; }
+  .sg-head, .sg-empty { padding: 10px 14px; color: var(--muted); font-size: 12px; }
+  .sg-empty { padding: 16px 14px; font-size: 13px; }
+  .sg { display: flex; align-items: center; gap: 10px; padding: 8px 14px; cursor: pointer; }
+  .sg.sel, .sg:hover { background: var(--panel2); }
+  .sg .ico { width: 28px; height: 28px; }
+  .sg .nm { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sg-r { margin-left: auto; text-align: right; white-space: nowrap; font-size: 13px; }
+  .sg-r small { display: block; color: var(--muted); font-size: 11px; }
+  .sg-r .dim { color: var(--dim); }
+  @media (max-width: 520px) { .searchwrap { order: 3; flex-basis: 100%; max-width: none; } .topinfo { margin-left: auto; } }
 </style>
 </head>
 <body>
@@ -336,7 +350,8 @@
   <div class="main">
     <div class="topbar">
       <button class="menubtn" id="menubtn" aria-label="Menu"><svg class="i"><use href="#i-menu"/></svg></button>
-      <label class="search"><svg class="i"><use href="#i-search"/></svg><input id="search" type="search" placeholder="Search items…" autocomplete="off"></label>
+      <div class="searchwrap"><label class="search"><svg class="i"><use href="#i-search"/></svg><input id="search" type="search" placeholder="Search items…" autocomplete="off"></label>
+        <div class="suggest" id="suggest" hidden></div></div>
       <div class="topinfo">
         <span class="sync" id="sync"></span>
         <div class="seg" id="factionseg" title="Which auction houses to include"></div>
@@ -911,7 +926,7 @@ async function renderItem() {
   const houses = itemHouses(r.item_id);
   if (!houses.some((h) => h.id === IV.house) && houses[0]) IV.house = houses[0].id;
   const key = IV.house + ":" + r.item_id, lad = D.ladders.get(key) || [], m = D.markets.get(key);
-  const units = lad.reduce((a, [, n]) => a + n, 0), vendor = itemOf(D, r.item_id).vendor, spd = m ? sellsDay(m) : null;
+  const units = lad.reduce((a, [, n]) => a + n, 0), vendor = itemOf(D, r.item_id).vendor || r.vendor || 0, spd = m ? sellsDay(m) : null;
   const st = statsFor(IV.house, r.item_id);
 
   $("dhead").innerHTML = `${itemIcon(r, q)}<div class="t"><div class="nm q-${q}">${esc(r.name)}</div>` +
@@ -931,8 +946,8 @@ async function renderItem() {
     ["Trend 24h", trend(st.chg24)],
     ["Trend 7 days", trend(st.chg7)],
     ["Units listed", units.toLocaleString("en") + ` <small>${lad.reduce((a, l) => a + l[2], 0)} auctions</small>`],
-    ["Sells per day", spd == null ? `<span style="color:var(--dim)">tracking…</span>` : round1(spd).toLocaleString("en")],
-    ["Sell rate", st.sell_rate == null ? `<span style="color:var(--dim)">tracking…</span>` : Math.round(st.sell_rate * 100) + "%",
+    ["Sells per day", spd != null ? round1(spd).toLocaleString("en") : m ? `<span style="color:var(--dim)">tracking…</span>` : "–"],
+    ["Sell rate", st.sell_rate != null ? Math.round(st.sell_rate * 100) + "%" : m ? `<span style="color:var(--dim)">tracking…</span>` : "–",
      "share of units leaving the AH that sold (estimate)"],
     ["Days of supply", daysLabel(st.days_supply), "how long the listed stock lasts at the current sales pace"],
   ].map(([k, v, tip]) => `<div${tip ? ` title="${esc(tip)}"` : ""}><span>${k}</span><b>${v}</b></div>`).join("");
@@ -943,8 +958,12 @@ async function renderItem() {
       : r.kind === "vendor" ? `Buy <b>${r.buy_units}</b> up to ${money(r.buy_upto)} and sell to a vendor for ${money(r.sell_at)}`
       : `Buy <b>${r.buy_units}</b> up to ${money(r.buy_upto)}, relist at ${money(r.sell_at)}`) +
     ` → profit <b class="profit">${money(r.profit)}</b> <span class="roi">(${Math.round(r.roi * 100)}%)</span>` : "";
-  $("dflip").innerHTML = fl;
-  $("dflip").hidden = !fl;
+  const listed = itemHouses(r.item_id).some((h) => D.ladders.has(h.id + ":" + r.item_id));
+  const note = !fl && !listed ? `<span class="tag" style="background:var(--panel2);color:var(--muted)">Not listed</span> ` +
+    `Nobody is selling this on the auction house right now.${D.region[r.item_id] ? " The region price shows what it goes for on other servers." : ""}` : "";
+  $("dflip").innerHTML = fl || note;
+  $("dflip").classList.toggle("muted", !fl);
+  $("dflip").hidden = !(fl || note);
   $("dreagents").innerHTML = r.kind === "craft" ? reagentTable(r) : "";
 
   $("dhouses").innerHTML = houses.map((h) => `<button data-h="${h.id}" class="${h.id === IV.house ? "on" : ""}">${esc(short(h.name))}</button>`).join("");
@@ -1053,6 +1072,92 @@ function hoverAt(e) {
 }
 function hoverOut() { if (IV) { IV.hover = null; drawItem(); } }
 
+// ---------- search every item ----------
+// data/items.json holds every item in the game (name, quality, icon, vendor price). It loads the
+// first time the search box is used, so normal page loads stay small.
+let IDX = null, idxLoading = null, sugg = [], suggSel = 0;
+function loadIndex() {
+  if (!idxLoading) idxLoading = fetch("data/items.json", { cache: "no-store" })
+    .then((r) => r.ok ? r.json() : {}).then(unlock).catch(() => ({}))
+    .then((idx) => {
+      const all = { ...idx };
+      for (const [id, it] of Object.entries(D ? D.items : {})) if (!all[id]) all[id] = [it[0], it[1], it[3], it[2]];
+      IDX = Object.entries(all).map(([id, [name, quality, icon, vendor]]) => ({ id: +id, name, lower: (name || "").toLowerCase(), quality, icon, vendor }));
+      return IDX;
+    });
+  return idxLoading;
+}
+
+// cheapest market value among houses this character can use -> { house, market, houses }
+function listedInfo(iid) {
+  let best = null, n = 0;
+  for (const h of D.houses.values()) {
+    if (!accessible(h, faction())) continue;
+    const m = D.markets.get(h.id + ":" + iid);
+    if (!m || !D.ladders.has(h.id + ":" + iid)) continue;
+    n++;
+    if (!best || m.market < best.market) best = { house: h, market: m.market };
+  }
+  return best ? { ...best, houses: n } : null;
+}
+
+function searchItems(q) {
+  q = q.trim().toLowerCase();
+  if (q.length < 2 || !IDX) return [];
+  const hits = [];
+  for (const it of IDX) {
+    const at = it.lower.indexOf(q);
+    if (at < 0) continue;
+    const info = listedInfo(it.id);
+    // names starting with the text first, then items on the auction house, then shorter names
+    hits.push({ it, info, score: (at === 0 ? 0 : 2) + (info ? 0 : 1) + it.name.length / 1000 });
+  }
+  return hits.sort((a, b) => a.score - b.score).slice(0, 12);
+}
+
+function renderSuggest() {
+  const box = $("suggest"), q = $("search").value.trim();
+  if (q.length < 2) { box.hidden = true; return; }
+  if (!IDX) { box.hidden = false; box.innerHTML = `<div class="sg-empty">Loading the item list…</div>`; return; }
+  sugg = searchItems(q);
+  suggSel = Math.min(suggSel, Math.max(0, sugg.length - 1));
+  box.hidden = false;
+  if (!sugg.length) { box.innerHTML = `<div class="sg-empty">No item called “${esc(q)}”</div>`; return; }
+  box.innerHTML = `<div class="sg-head">Items · ${IDX.length.toLocaleString("en")} in the game</div>` + sugg.map(({ it, info }, i) => {
+    const q2 = esc(it.quality || "common"), reg = D.region[it.id];
+    const right = info ? `${money(info.market)}<small>${esc(short(info.house.name))}${info.houses > 1 ? ` +${info.houses - 1}` : ""}</small>`
+      : reg ? `<span class="dim">not listed here</span><small>region ${money(reg[0])}</small>` : `<span class="dim">not on the AH</span>`;
+    return `<div class="sg ${i === suggSel ? "sel" : ""}" data-sg="${i}">${itemIcon({ ...it, item_id: it.id }, q2)}` +
+      `<span class="nm q-${q2}">${esc(it.name)}</span><span class="sg-r">${right}</span></div>`;
+  }).join("");
+}
+
+function pickSuggest(i) {
+  const s = sugg[i];
+  if (!s) return;
+  const { it, info } = s;
+  // use this item's best flip if there is one, so the item view shows it
+  const flip = KINDS.flatMap((k) => all[k] || []).filter((r) => r.item_id === it.id).sort((a, b) => b.profit - a.profit)[0];
+  const house = info ? info.house.id : (itemHouses(it.id)[0] || [...D.houses.values()][0] || {}).id;
+  $("suggest").hidden = true;
+  $("search").blur();
+  openItem(flip || { ...itemOf(D, it.id), item_id: it.id, name: it.name, quality: it.quality, icon: it.icon, vendor: it.vendor, house_id: house });
+}
+
+$("search").addEventListener("focus", () => { if (D) loadIndex().then(renderSuggest); });
+$("search").addEventListener("keydown", (e) => {
+  if ($("suggest").hidden) return;
+  if (e.key === "ArrowDown") { suggSel = Math.min(suggSel + 1, sugg.length - 1); renderSuggest(); e.preventDefault(); }
+  else if (e.key === "ArrowUp") { suggSel = Math.max(suggSel - 1, 0); renderSuggest(); e.preventDefault(); }
+  else if (e.key === "Enter") { pickSuggest(suggSel); e.preventDefault(); }
+  else if (e.key === "Escape") { $("suggest").hidden = true; }
+});
+$("suggest").addEventListener("mousedown", (e) => {
+  const row = e.target.closest("[data-sg]");
+  if (row) { e.preventDefault(); pickSuggest(+row.dataset.sg); }
+});
+document.addEventListener("click", (e) => { if (!e.target.closest(".searchwrap")) $("suggest").hidden = true; });
+
 // ---------- navigation ----------
 function showPage(p) {
   if (/^item\/\d+\/\d+/.test(p)) {
@@ -1071,7 +1176,7 @@ function showPage(p) {
   $("page-overview").hidden = p !== "overview";
   $("page-flips").hidden = p === "overview";
   const title = p === "craft" && craftProf ? craftProf : p !== "overview" ? PAGES[p].title : "";
-  $("search").placeholder = p === "overview" ? "Search items in all flips…" : `Search ${title.toLowerCase()} ${p === "craft" ? "recipes" : "flips"}…`;
+  $("search").placeholder = p === "overview" ? "Search any item…" : `Search ${title.toLowerCase()} ${p === "craft" ? "recipes" : "flips"}…`;
   if (p !== "overview") {
     if (kind !== p) { kind = p; sortKey = "profit"; sortAsc = false; }
     $("ptitle").textContent = p === "craft" && craftProf ? `${craftProf} profits` : PAGES[p].title;
@@ -1103,8 +1208,10 @@ $("filterbtn").onclick = () => { $("filters").classList.toggle("show"); $("filte
 $("resetfilters").onclick = () => { try { localStorage.removeItem("ff-" + kind); } catch (e) {} loadFilters(); refresh(); };
 $("filters").addEventListener("change", () => refresh());
 $("search").addEventListener("input", () => {
-  if (page === "overview" && $("search").value.trim()) { location.hash = "#" + (["reset", "arbitrage", "vendor"].find((k) => all[k] && all[k].some((r) => r.name.toLowerCase().includes($("search").value.trim().toLowerCase()))) || "reset"); return; }
-  if (page !== "overview") renderPage();
+  suggSel = 0;
+  if (D) loadIndex().then(renderSuggest);
+  renderSuggest();
+  if (page !== "overview" && page !== "item") renderPage();
 });
 document.addEventListener("click", (e) => {
   const cp = e.target.closest("[data-copy]");
