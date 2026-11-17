@@ -57,6 +57,10 @@ def status(db, cfg, extra=None):
     }
 
 
+def _r(v, n):
+    return None if v is None else round(v, n)
+
+
 def latest(db, cfg, extra=None):
     rs = cfg["ruleset"]
     ladders = defaultdict(list)
@@ -66,7 +70,8 @@ def latest(db, cfg, extra=None):
     markets = [
         [m["house_id"], m["item_id"], m["market"], m["seen"], round(m["avg_listings"], 2),
          round(m["avg_quantity"], 2), None if m["sold_per_day"] is None else round(m["sold_per_day"], 4),
-         round(m["tracked_h"] or 0, 1)]
+         round(m["tracked_h"] or 0, 1), _r(m["sell_rate"], 3), m["low7"], m["avg7"], m["high7"],
+         _r(m["chg24"], 3), _r(m["chg7"], 3)]
         for m in db.query("SELECT * FROM market WHERE ruleset=?", (rs,))
         if (m["house_id"], m["item_id"]) in ladders
     ]
@@ -87,8 +92,12 @@ def latest(db, cfg, extra=None):
         "houses": [[h["house_id"], h["name"], h["neutral"]]
                    for h in db.query("SELECT house_id, name, neutral FROM houses WHERE ruleset=? ORDER BY name", (rs,))],
         "items": items,
-        # house, item, market, seen, avg_listings, avg_quantity, sold_per_day, tracked_h
+        # house, item, market, seen, avg_listings, avg_quantity, sold_per_day, tracked_h,
+        # sell_rate, low7, avg7, high7, chg24, chg7
         "markets": markets,
+        # item -> [region price over the window, region price now, houses listed in]
+        "region": {str(r["item_id"]): [r["market7"], r["current"], r["houses"]]
+                   for r in db.query("SELECT * FROM region_market") if r["item_id"] in ids},
         # house, item, [[unit_price, quantity, auctions], ...] cheapest first
         "ladders": [[h, i, lad] for (h, i), lad in ladders.items()],
         # recipe id, name, profession, crafted item, crafted quantity, [[reagent item, quantity], ...]

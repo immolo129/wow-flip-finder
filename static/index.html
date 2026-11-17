@@ -167,10 +167,10 @@
   .dhead .links { display: flex; gap: 6px; margin-top: 6px; }
   .dhead .x { margin-left: auto; align-self: flex-start; padding: 6px 11px; }
   .dflip { margin-top: 16px; padding: 12px 14px; border-radius: 10px; background: var(--accent-soft); border: 1px solid rgba(242, 184, 29, .25); line-height: 1.7; }
-  .dstats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+  .dstats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
   .dstats div { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
   .dstats > div > span { display: block; color: var(--muted); font-size: 12px; }
-  .dstats b { display: block; font: 600 16px/1.4 var(--head); margin-top: 2px; }
+  .dstats b { display: block; font: 600 15px/1.4 var(--head); margin-top: 2px; }
   .dstats small { color: var(--dim); font: 400 11px var(--body); }
   .dctl { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 20px 0 10px; }
   .chartbox { position: relative; }
@@ -454,12 +454,13 @@ const COLS = {
   reset: [
     ["name", "Item", "item"], ["house", "House", "l"], ["below", "Below market", "below"], ["buy_units", "Units"],
     ["buy_upto", "Buy up to", "m"], ["cost", "Cost", "m"], ["sell_at", "Sell at", "m"], ["profit", "Profit", "m p"],
-    ["roi", "ROI", "r"], ["sells_day", "Sells/day", "v"], ["confidence", "Data", "conf"],
+    ["roi", "ROI", "r"], ["sells_day", "Sells/day", "v"], ["sell_rate", "Sell rate", "pct"], ["chg24", "24h", "chg"],
+    ["region", "Region", "m"], ["confidence", "Data", "conf"],
   ],
   arbitrage: [
     ["name", "Item", "item"], ["buy_house", "Buy in", "l"], ["sell_house", "Sell in", "l"], ["buy_units", "Units"],
     ["buy_upto", "Buy up to", "m"], ["cost", "Cost", "m"], ["sell_at", "Sell at", "m"], ["profit", "Profit", "m p"],
-    ["roi", "ROI", "r"], ["sells_day", "Sells/day", "v"], ["route", "Route", "route"], ["confidence", "Data", "conf"],
+    ["roi", "ROI", "r"], ["sells_day", "Sells/day", "v"], ["sell_rate", "Sell rate", "pct"], ["route", "Route", "route"], ["confidence", "Data", "conf"],
   ],
   vendor: [
     ["name", "Item", "item"], ["house", "House", "l"], ["buy_units", "Units"], ["buy_upto", "Buy up to", "m"],
@@ -467,7 +468,8 @@ const COLS = {
   ],
   craft: [
     ["name", "Crafted item", "item"], ["profession", "Profession", "l"], ["house", "Sell in", "l"], ["cost", "Reagent cost", "m"],
-    ["sell_at", "Sells for", "m"], ["profit", "Profit", "m p"], ["roi", "ROI", "r"], ["sells_day", "Sells/day", "v"], ["confidence", "Data", "conf"],
+    ["sell_at", "Sells for", "m"], ["region", "Region", "m"], ["profit", "Profit", "m p"], ["roi", "ROI", "r"], ["sells_day", "Sells/day", "v"],
+    ["sell_rate", "Sell rate", "pct"], ["confidence", "Data", "conf"],
   ],
 };
 const KINDS = ["reset", "arbitrage", "vendor", "craft"];
@@ -544,7 +546,18 @@ function markNav() {
 }
 const showAll = () => prefs().houses === "all";
 const faction = () => (showAll() ? null : D.status.faction);
-const compute = (k, f) => FLIPS[k](D, toCalc(k, f), faction()).map((r) => ({ ...r, kind: k,
+// sell rate, trend, 7-day range, days of supply and region price for an item in a house
+function statsFor(hid, iid) {
+  const m = D.markets.get(hid + ":" + iid) || {}, lad = D.ladders.get(hid + ":" + iid) || [];
+  const tracked = (m.tracked_h || 0) >= MIN_TRACKED_H, spd = m.market ? sellsDay(m) : null, reg = D.region[iid];
+  const units = lad.reduce((a, [, n]) => a + n, 0);
+  return {
+    sell_rate: tracked && m.sell_rate != null ? m.sell_rate : null, chg24: m.chg24 ?? null, chg7: m.chg7 ?? null,
+    low7: m.low7 ?? null, avg7: m.avg7 ?? null, high7: m.high7 ?? null, units_now: units,
+    days_supply: spd ? units / spd : null, region: reg ? reg[0] : null, region_now: reg ? reg[1] : null, region_houses: reg ? reg[2] : null,
+  };
+}
+const compute = (k, f) => FLIPS[k](D, toCalc(k, f), faction()).map((r) => ({ ...statsFor(r.house_id, r.item_id), ...r, kind: k,
   below: r.market && r.buy_upto ? 1 - r.buy_upto / r.market : null }));
 
 // ---------- password lock ----------
@@ -844,6 +857,9 @@ function renderPage() {
     if (t === "r") return `<td class="roi">${Math.round(v * 100)}%</td>`;
     if (t === "below") return v == null ? "<td class='muted'>–</td>" :
       `<td><span class="below">${Math.round(v * 100)}%<span class="bar"><i style="width:${Math.min(100, Math.max(4, v * 100))}%"></i></span></span></td>`;
+    if (t === "pct") return v == null ? `<td class="muted" title="Needs 12 h of sales tracking">–</td>`
+      : `<td title="Estimated share of the units leaving the AH that sold (the rest expired or were cancelled)">${Math.round(v * 100)}%</td>`;
+    if (t === "chg") return `<td>${trend(v)}</td>`;
     if (t === "v") return v == null ? `<td class="muted" title="Not enough sales tracking yet (needs 12 h)">–</td>`
       : `<td title="Estimated: auctions that disappeared while they still had hours left">${v.toLocaleString("en")}</td>`;
     if (t === "conf") return `<td class="l"><span class="conf ${v}" title="${r.seen} snapshots">${v}</span></td>`;
@@ -853,6 +869,10 @@ function renderPage() {
   }).join("") + "</tr>").join("");
   tb._list = list;
 }
+
+const trend = (v) => v == null ? `<span style="color:var(--dim)" title="Not enough history yet">–</span>`
+  : `<span style="color:${v > 0.005 ? "var(--good)" : v < -0.005 ? "var(--bad)" : "var(--muted)"}">${v > 0 ? "+" : ""}${Math.round(v * 100)}%</span>`;
+const daysLabel = (d) => d == null ? "–" : d < 1 ? `${Math.max(1, Math.round(d * 24))} h` : `${d < 10 ? round1(d) : Math.round(d)} days`;
 
 // ---------- price history ----------
 async function loadHistory(houseId, itemId) {
@@ -892,6 +912,7 @@ async function renderItem() {
   if (!houses.some((h) => h.id === IV.house) && houses[0]) IV.house = houses[0].id;
   const key = IV.house + ":" + r.item_id, lad = D.ladders.get(key) || [], m = D.markets.get(key);
   const units = lad.reduce((a, [, n]) => a + n, 0), vendor = itemOf(D, r.item_id).vendor, spd = m ? sellsDay(m) : null;
+  const st = statsFor(IV.house, r.item_id);
 
   $("dhead").innerHTML = `${itemIcon(r, q)}<div class="t"><div class="nm q-${q}">${esc(r.name)}</div>` +
     `<div class="links"><button class="mini" data-copy="${esc(r.name)}">copy</button>` +
@@ -903,11 +924,18 @@ async function renderItem() {
   $("dstats").innerHTML = [
     ["Lowest price now", lad.length ? money(lad[0][0]) : "–"],
     ["Market value", m ? money(m.market) : "–"],
+    ["Region price", st.region != null ? money(st.region) : "–", st.region_houses ? `median of ${st.region_houses} auction houses` : ""],
     ["Vendor pays", vendor ? money(vendor) : "–"],
+    ["7-day range", st.low7 != null ? `${money(st.low7)} – ${money(st.high7)}` : "–"],
+    ["7-day average", st.avg7 != null ? money(st.avg7) : "–"],
+    ["Trend 24h", trend(st.chg24)],
+    ["Trend 7 days", trend(st.chg7)],
     ["Units listed", units.toLocaleString("en") + ` <small>${lad.reduce((a, l) => a + l[2], 0)} auctions</small>`],
     ["Sells per day", spd == null ? `<span style="color:var(--dim)">tracking…</span>` : round1(spd).toLocaleString("en")],
-    ["History", m ? `${m.seen} snapshots` : "–"],
-  ].map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join("");
+    ["Sell rate", st.sell_rate == null ? `<span style="color:var(--dim)">tracking…</span>` : Math.round(st.sell_rate * 100) + "%",
+     "share of units leaving the AH that sold (estimate)"],
+    ["Days of supply", daysLabel(st.days_supply), "how long the listed stock lasts at the current sales pace"],
+  ].map(([k, v, tip]) => `<div${tip ? ` title="${esc(tip)}"` : ""}><span>${k}</span><b>${v}</b></div>`).join("");
 
   const fl = r.kind ? `<span class="tag ${r.kind}">${esc(PAGES[r.kind].tag)}</span> ` +
     (r.kind === "arbitrage" ? `Buy <b>${r.buy_units}</b> in ${esc(short(r.buy_house))} up to ${money(r.buy_upto)}, sell in ${esc(short(r.sell_house))} at ${money(r.sell_at)}`

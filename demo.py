@@ -106,6 +106,8 @@ def build(db, ruleset, hours=96, seed=42):
 
     drift = {i: 1.0 for i, *_ in ITEMS}
     turnover = {i: rng.uniform(0.005, 0.06) for i, *_ in ITEMS}  # share of listed units sold per hour
+    sellrate = {i: rng.uniform(0.3, 0.9) for i, *_ in ITEMS}      # share of units leaving that sold
+    region = {i: rng.uniform(0.85, 1.2) for i, *_ in ITEMS}       # region price vs this server
     for h in range(hours, -1, -1):
         ts = now - h * 3600
         for i in drift:
@@ -118,11 +120,18 @@ def build(db, ruleset, hours=96, seed=42):
                     listings.append((iid, p, q))
             if h == 0:
                 listings += _plant(rng, hid)
-            sales = None if h == hours else {
-                iid: int(units * HOUSE_SUPPLY[hid] * turnover[iid] * rng.uniform(0.3, 1.7))
-                for iid, _, _, _, _, units in ITEMS}
+            sales = None
+            if h != hours:
+                sold = {iid: int(units * HOUSE_SUPPLY[hid] * turnover[iid] * rng.uniform(0.3, 1.7))
+                        for iid, _, _, _, _, units in ITEMS}
+                sales = {iid: (n, int(n / sellrate[iid])) for iid, n in sold.items()}
             collector.store_snapshot(db, ruleset, hid, listings, ts=ts, sales=sales)
+        # region price: one median per item per hour, as if from every Forever server type
+        db.executemany("INSERT INTO region_stats VALUES (?,?,?,?,?)",
+                       [(ts, iid, int(base * drift[iid] * region[iid] * rng.uniform(0.95, 1.05)), units * 4, 40)
+                        for iid, _, _, _, base, units in ITEMS])
     collector.recompute_market(db, ruleset, now=now)
+    collector.recompute_region(db, now=now)
 
 
 def _plant(rng, hid):

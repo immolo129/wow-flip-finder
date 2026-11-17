@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS sales (
     snapshot_id INTEGER,
     item_id     INTEGER,
     sold        INTEGER,
+    gone        INTEGER,   -- all units that left (sold, expired or cancelled)
     PRIMARY KEY (snapshot_id, item_id)
 );
 
@@ -75,6 +76,12 @@ CREATE TABLE IF NOT EXISTS market (
     avg_quantity REAL,
     sold_per_day REAL,     -- estimated, NULL until sales have been tracked
     tracked_h    REAL,     -- hours of sales tracking behind sold_per_day
+    sell_rate    REAL,     -- sold / all units that left, NULL until enough data
+    low7         INTEGER,  -- lowest, average and highest market value in the window
+    avg7         INTEGER,
+    high7        INTEGER,
+    chg24        REAL,     -- market value change over 24 h and over the window, as a fraction
+    chg7         REAL,
     PRIMARY KEY (ruleset, house_id, item_id)
 );
 
@@ -106,6 +113,22 @@ CREATE TABLE IF NOT EXISTS recipe_reagents (
 );
 CREATE INDEX IF NOT EXISTS ix_reagents ON recipe_reagents (recipe_id);
 
+-- region prices: the median market value across every house of every Forever ruleset, per run
+CREATE TABLE IF NOT EXISTS region_stats (
+    ts       INTEGER,
+    item_id  INTEGER,
+    market   INTEGER,
+    quantity INTEGER,
+    houses   INTEGER
+);
+CREATE INDEX IF NOT EXISTS ix_region ON region_stats (ts);
+CREATE TABLE IF NOT EXISTS region_market (
+    item_id  INTEGER PRIMARY KEY,
+    market7  INTEGER,  -- median of the region price over the window
+    current  INTEGER,  -- region price in the latest run
+    houses   INTEGER   -- houses it was listed in, latest run
+);
+
 CREATE TABLE IF NOT EXISTS meta (
     key   TEXT PRIMARY KEY,
     value TEXT
@@ -122,7 +145,9 @@ CREATE TABLE IF NOT EXISTS runs (
 # columns added after the first release; added to older databases on start-up
 MIGRATIONS = {
     "snapshots": [("fingerprint", "TEXT"), ("gap", "INTEGER")],
-    "market": [("sold_per_day", "REAL"), ("tracked_h", "REAL")],
+    "market": [("sold_per_day", "REAL"), ("tracked_h", "REAL"), ("sell_rate", "REAL"), ("low7", "INTEGER"),
+               ("avg7", "INTEGER"), ("high7", "INTEGER"), ("chg24", "REAL"), ("chg7", "REAL")],
+    "sales": [("gone", "INTEGER")],
     "items": [("icon", "TEXT"), ("icon_ts", "INTEGER"), ("vendor_buy", "INTEGER")],
 }
 

@@ -101,6 +101,16 @@ the item name for the AH search box.
 snapshots while they still had 2+ hours left. Cancelled auctions count as sales
 too, so it reads a bit high for items that people repost a lot.
 
+**More stats** (columns and the item view; click an item, then Details):
+
+| Stat | Meaning |
+|---|---|
+| Sell rate | Of the units that left the auction house, the share that sold rather than expired or was cancelled. An estimate on the low side. Needs 12 h of tracking. |
+| Days of supply | How long the units listed now last at the current sales pace |
+| Trend 24h / 7 days | Change in market value |
+| 7-day range / average | Lowest, highest and average market value over the last week |
+| Region price | Median market value across every auction house of every Forever server type (PvP, Normal, RP, RP-PvP), like TSM's region values |
+
 If Blizzard hasn't updated an auction house since the last fetch, that data is
 skipped instead of being saved twice.
 

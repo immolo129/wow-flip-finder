@@ -16,8 +16,9 @@ function prepare(raw) {
               recipes: raw.recipes || [] };
   for (const [id, name, neutral] of raw.houses) D.houses.set(id, { id, name, neutral: !!neutral });
   for (const [h, i, lad] of raw.ladders) { D.ladders.set(h + ":" + i, lad); D.list.push([h, i, lad]); }
-  for (const [h, i, market, seen, avg_listings, avg_quantity, sold_per_day, tracked_h] of raw.markets)
-    D.markets.set(h + ":" + i, { market, seen, avg_listings, avg_quantity, sold_per_day, tracked_h });
+  for (const [h, i, market, seen, avg_listings, avg_quantity, sold_per_day, tracked_h, sell_rate, low7, avg7, high7, chg24, chg7] of raw.markets)
+    D.markets.set(h + ":" + i, { market, seen, avg_listings, avg_quantity, sold_per_day, tracked_h, sell_rate, low7, avg7, high7, chg24, chg7 });
+  D.region = raw.region || {};
   return D;
 }
 
