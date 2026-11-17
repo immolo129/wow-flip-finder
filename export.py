@@ -153,4 +153,5 @@ def write_site(db, cfg, out_dir, static_dir, extra=None, password=None, site_id=
     # counts only (nothing secret), for the run log
     return {"houses": len(data["houses"]), "items listed": len(data["ladders"]),
             "recipes": len(data["recipes"]), "professions": len({r[2] for r in data["recipes"]}),
-            "icons": sum(1 for it in data["items"].values() if it[3]), "items": len(data["items"])}
+            "icons": sum(1 for it in data["items"].values() if it[3]), "items": len(data["items"]),
+            "region prices": len(data["region"]), "sell rates": sum(1 for m in data["markets"] if m[8] is not None)}
