@@ -4,129 +4,349 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Forever Flip Finder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0f1115; --panel: #171a21; --panel2: #1e222b; --line: #2a2f3a;
-    --text: #e6e6e6; --muted: #8b93a3; --accent: #c8a24a; --good: #5fbf6a; --bad: #e0625b;
-    --gold: #e9c25a; --silver: #c7ccd6; --copper: #c9814f;
+    --bg: #09090b; --side: #0c0c0f; --panel: #131316; --panel2: #1b1b20; --line: #25252b; --line2: #33333b;
+    --text: #ececf1; --muted: #8e8e99; --dim: #5f5f69;
+    --accent: #f2b81d; --accent-ink: #1a1300; --accent-soft: rgba(242, 184, 29, .12);
+    --blue: #3aa8ff; --good: #4ade80; --bad: #f87171;
+    --gold: #f2c94c; --silver: #c9ced8; --copper: #d08a57;
     --q-common: #ffffff; --q-uncommon: #1eff00; --q-rare: #0070dd; --q-epic: #a335ee; --q-poor: #9d9d9d;
+    --radius: 12px;
+    --head: "Poppins", system-ui, sans-serif;
+    --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;
-           padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel); }
-  h1 { margin: 0; font-size: 18px; letter-spacing: .3px; }
-  h1 span { color: var(--accent); }
-  .status { color: var(--muted); font-size: 13px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
-  .pill { padding: 2px 8px; border-radius: 99px; background: var(--panel2); border: 1px solid var(--line); }
-  .pill.err { color: var(--bad); border-color: var(--bad); }
-  .pill.demo { color: var(--accent); border-color: var(--accent); }
-  button { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 6px;
-           padding: 6px 12px; cursor: pointer; font: inherit; }
-  button:hover { border-color: var(--accent); }
-  main { padding: 16px 20px 40px; max-width: 1500px; margin: 0 auto; }
-  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 12px; overflow-x: auto; }
-  .tab { padding: 10px 16px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--muted); white-space: nowrap; }
-  .tab.active { color: var(--text); border-bottom-color: var(--accent); }
-  .tab .count { color: var(--accent); margin-left: 6px; font-size: 12px; }
-  .help { color: var(--muted); margin: 0 0 12px; font-size: 13px; }
-  .filters { display: flex; flex-wrap: wrap; gap: 14px; align-items: end; background: var(--panel); border: 1px solid var(--line);
-             border-radius: 8px; padding: 12px; margin-bottom: 12px; }
-  .filters label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
-  .filters input[type=number], .filters input[type=text] { width: 110px; background: var(--panel2); color: var(--text);
-             border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font: inherit; }
-  .filters input[type=text] { width: 180px; }
-  .filters .chk { flex-direction: row; align-items: center; gap: 6px; padding-bottom: 6px; }
-  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
-  table { width: 100%; border-collapse: collapse; background: var(--panel); }
-  th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
-  th { position: sticky; top: 0; background: var(--panel2); color: var(--muted); font-weight: 600; font-size: 12px; cursor: pointer; user-select: none; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.45 var(--body); }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  a { color: inherit; }
+  svg.i { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ---------- layout ---------- */
+  .app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+  aside { background: var(--side); border-right: 1px solid var(--line); display: flex; flex-direction: column;
+          position: sticky; top: 0; height: 100vh; padding: 14px 10px; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 18px; }
+  .brand .mark { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center;
+                 background: linear-gradient(145deg, #f7cf55, #b9820c); color: var(--accent-ink); font: 700 17px var(--head); }
+  .brand b { font: 700 16px/1.1 var(--head); letter-spacing: .2px; display: block; }
+  .brand small { color: var(--muted); font-size: 11px; letter-spacing: .6px; text-transform: uppercase; }
+  nav a { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; color: var(--muted);
+          text-decoration: none; font-weight: 500; margin-bottom: 2px; }
+  nav a:hover { color: var(--text); background: var(--panel); }
+  nav a.active { color: var(--text); background: var(--panel2); }
+  nav a.active svg { color: var(--accent); }
+  nav a .n { margin-left: auto; font-size: 11px; color: var(--accent); background: var(--accent-soft);
+             padding: 1px 7px; border-radius: 99px; font-weight: 600; }
+  nav a .n:empty { display: none; }
+  .navlabel { display: flex; align-items: center; width: 100%; background: none; border: 0; color: var(--muted);
+              font-size: 13px; font-weight: 500; padding: 16px 10px 6px; text-align: left; }
+  .navlabel:hover { color: var(--text); }
+  .navlabel .chev { margin-left: auto; width: 14px; height: 14px; transition: transform .15s; }
+  .group.closed .chev { transform: rotate(-90deg); }
+  .group.closed .items { display: none; }
+  .sidefoot { margin-top: auto; border-top: 1px solid var(--line); padding: 12px 8px 0; color: var(--muted); font-size: 12px; }
+  .sidefoot .row { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+  .sidefoot .row span:last-child { color: var(--text); text-align: right; }
+
+  .main { min-width: 0; display: flex; flex-direction: column; }
+  .topbar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 24px;
+            background: rgba(9, 9, 11, .88); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+  .menubtn { display: none; background: none; border: 1px solid var(--line); border-radius: 8px; padding: 6px; }
+  .search { flex: 1; max-width: 560px; display: flex; align-items: center; gap: 8px; background: var(--panel);
+            border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; color: var(--muted); }
+  .search:focus-within { border-color: var(--line2); }
+  .search input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; color: var(--text); font: inherit; padding: 9px 0; }
+  .topinfo { margin-left: auto; display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; white-space: nowrap; }
+  .topinfo .sync b { color: var(--blue); font-weight: 600; }
+  .seg { display: inline-flex; background: var(--panel); border: 1px solid var(--line); border-radius: 9px; padding: 3px; gap: 2px; }
+  .seg button { background: none; border: 0; border-radius: 6px; padding: 4px 11px; color: var(--muted); font-weight: 500; font-size: 13px; }
+  .seg button.on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .btn { background: var(--panel2); border: 1px solid var(--line2); border-radius: 8px; padding: 6px 12px; font-weight: 500; font-size: 13px; }
+  .btn:hover { border-color: var(--dim); }
+  .btn.primary { background: var(--blue); border-color: var(--blue); color: #001526; font-weight: 600; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 99px; font-size: 12px;
+          border: 1px solid var(--line2); color: var(--muted); }
+  .pill.err { color: var(--bad); border-color: rgba(248, 113, 113, .45); }
+  .pill.demo { color: var(--accent); border-color: rgba(242, 184, 29, .45); }
+
+  .content { padding: 24px; max-width: 1400px; width: 100%; margin: 0 auto; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+  .card > .hd { padding: 18px 20px 4px; }
+  .card h2 { font: 600 17px/1.3 var(--head); margin: 0; }
+  .card .sub { color: var(--muted); margin: 6px 0 0; }
+  .card > .bd { padding: 14px 20px 20px; }
+
+  /* ---------- hero ---------- */
+  .hero { position: relative; overflow: hidden; border-radius: 16px; border: 1px solid var(--line2); margin-bottom: 20px;
+          background: radial-gradient(900px 260px at 85% 0%, rgba(242, 184, 29, .18), transparent 60%),
+                      radial-gradient(700px 300px at 10% 120%, rgba(58, 168, 255, .12), transparent 60%),
+                      linear-gradient(180deg, #1a1d24, #111216); }
+  .hero svg.mtn { position: absolute; inset: auto 0 0 0; width: 100%; height: 70%; opacity: .55; pointer-events: none; }
+  .hero .in { position: relative; padding: 26px 28px 22px; }
+  .hero .top { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+  .hero .crest { width: 64px; height: 64px; border-radius: 16px; display: grid; place-items: center; flex: none;
+                 background: linear-gradient(145deg, #f7cf55, #9c6d07); color: var(--accent-ink); font: 700 26px var(--head);
+                 box-shadow: 0 0 0 1px rgba(255, 255, 255, .15) inset, 0 10px 30px rgba(242, 184, 29, .25); }
+  .hero h1 { font: 700 26px/1.2 var(--head); margin: 0; }
+  .hero p { color: #b9bac4; margin: 4px 0 0; }
+  .hero .actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+  .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 24px; }
+  .stat { padding: 2px 20px; border-left: 1px solid rgba(255, 255, 255, .1); }
+  .stat:first-child { border-left: 0; padding-left: 0; }
+  .stat .k { font-size: 11px; letter-spacing: .8px; text-transform: uppercase; color: #a9aab5; font-weight: 600; }
+  .stat .v { font: 700 21px/1.3 var(--head); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stat .d { font-size: 12px; color: #9a9ba6; margin-top: 2px; }
+
+  .grid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 20px; align-items: start; }
+  .stack { display: grid; gap: 20px; }
+
+  /* ---------- tables ---------- */
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 11px 12px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+  th { position: sticky; top: 0; background: var(--panel); color: var(--muted); font-weight: 600; font-size: 12px;
+       cursor: pointer; user-select: none; }
+  th:first-child, td:first-child { padding-left: 20px; }
+  th:last-child, td:last-child { padding-right: 20px; }
   th.l, td.l { text-align: left; }
+  th.sorted { color: var(--text); }
   th.sorted::after { content: " ▾"; color: var(--accent); }
   th.sorted.asc::after { content: " ▴"; }
   tbody tr { cursor: pointer; }
-  tbody tr:hover { background: var(--panel2); }
-  tbody tr.open { background: #232835; }
+  tbody tr:hover { background: rgba(255, 255, 255, .025); }
+  tbody tr.open { background: var(--panel2); }
+  tbody tr:last-child td { border-bottom: 0; }
+  .item { display: flex; align-items: center; gap: 10px; }
+  .ico { width: 30px; height: 30px; border-radius: 7px; display: grid; place-items: center; flex: none; font: 700 13px var(--head);
+         background: var(--panel2); border: 1px solid currentColor; }
+  .item .nm { font-weight: 600; }
+  .item .acts { display: flex; gap: 4px; opacity: 0; transition: opacity .15s; }
+  tr:hover .item .acts, tr.open .item .acts { opacity: 1; }
+  .mini { background: var(--panel2); border: 1px solid var(--line2); border-radius: 6px; padding: 1px 7px; font-size: 11px;
+          color: var(--muted); text-decoration: none; }
+  .mini:hover { color: var(--text); }
   .money .g { color: var(--gold); } .money .s { color: var(--silver); } .money .c { color: var(--copper); }
   .profit { font-weight: 600; }
-  .roi { color: var(--good); }
-  .conf { font-size: 11px; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--line); }
-  .conf.high { color: var(--good); border-color: #2f5e35; } .conf.medium { color: var(--accent); border-color: #5e4f2a; } .conf.low { color: var(--bad); border-color: #5e2f2c; }
+  .roi { color: var(--good); font-weight: 500; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 6px; }
+  .tag.reset { background: rgba(242, 184, 29, .12); color: var(--accent); }
+  .tag.arbitrage { background: rgba(58, 168, 255, .12); color: var(--blue); }
+  .tag.vendor { background: rgba(74, 222, 128, .12); color: var(--good); }
+  .conf { font-size: 11px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line2); }
+  .conf.high { color: var(--good); border-color: rgba(74, 222, 128, .35); }
+  .conf.medium { color: var(--accent); border-color: rgba(242, 184, 29, .35); }
+  .conf.low { color: var(--bad); border-color: rgba(248, 113, 113, .35); }
+  .below { display: inline-flex; align-items: center; gap: 8px; }
+  .below .bar { width: 54px; height: 6px; border-radius: 99px; background: var(--panel2); overflow: hidden; }
+  .below .bar i { display: block; height: 100%; background: var(--good); border-radius: 99px; }
   .route { color: var(--muted); font-size: 12px; }
   .route.alt { color: var(--bad); }
-  td.muted { color: var(--muted); }
+  td.muted { color: var(--dim); }
   .q-common { color: var(--q-common); } .q-uncommon { color: var(--q-uncommon); } .q-rare { color: var(--q-rare); }
   .q-epic { color: var(--q-epic); } .q-poor { color: var(--q-poor); }
-  a.wh { color: var(--muted); text-decoration: none; margin-left: 6px; font-size: 11px; }
-  a.wh:hover { color: var(--accent); }
-  .copy { margin-left: 6px; padding: 1px 6px; font-size: 11px; }
-  .detail td { background: #13161c; cursor: default; text-align: left; }
-  .detail canvas { width: 100%; height: 180px; display: block; }
-  .legend { color: var(--muted); font-size: 12px; margin-top: 4px; }
-  .legend b { font-weight: normal; }
-  .empty { padding: 40px; text-align: center; color: var(--muted); background: var(--panel); }
-  .totals { color: var(--muted); font-size: 13px; margin: 8px 2px; }
-  footer { color: var(--muted); font-size: 12px; margin-top: 18px; }
-  #lock { display: none; max-width: 360px; margin: 12vh auto 0; background: var(--panel); border: 1px solid var(--line);
-          border-radius: 10px; padding: 24px; }
-  #lock h2 { margin: 0 0 6px; font-size: 17px; }
-  #lock p { color: var(--muted); margin: 0 0 14px; font-size: 13px; }
-  #lock input[type=password] { width: 100%; background: var(--panel2); color: var(--text); border: 1px solid var(--line);
-          border-radius: 6px; padding: 9px 10px; font: inherit; margin-bottom: 10px; }
-  #lock label { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 13px; margin-bottom: 14px; }
-  #lock button { width: 100%; padding: 9px; }
-  #lock .err { color: var(--bad); min-height: 1.4em; margin: 10px 0 0; }
-  body.locked main, body.locked .status { display: none; }
-  body.locked #lock { display: block; }
-  @media (max-width: 700px) { header, main { padding-left: 12px; padding-right: 12px; } }
+  .detail td { background: #0f0f12; cursor: default; text-align: left; padding: 16px 20px; }
+  .detail canvas { width: 100%; height: 200px; display: block; }
+  .legend { color: var(--muted); font-size: 12px; margin-top: 8px; display: flex; gap: 16px; flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+  .empty { padding: 48px 20px; text-align: center; color: var(--muted); }
+  .empty b { display: block; color: var(--text); font: 600 15px var(--head); margin-bottom: 4px; }
+
+  /* ---------- side cards ---------- */
+  .houses { display: grid; gap: 8px; }
+  .house { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel2); }
+  .house .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .house .meta { margin-left: auto; color: var(--muted); font-size: 12px; text-align: right; }
+  .house.off { opacity: .45; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; }
+  .kv span:nth-child(odd) { color: var(--muted); }
+  .kv span:nth-child(even) { text-align: right; }
+  .tips { margin: 0; padding-left: 18px; color: var(--muted); }
+  .tips li { margin-bottom: 6px; }
+  .tips b { color: var(--text); font-weight: 600; }
+
+  /* ---------- strategy pages ---------- */
+  .pagehead { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+  .pagehead h1 { font: 700 24px/1.2 var(--head); margin: 0; }
+  .pagehead p { color: var(--muted); margin: 6px 0 0; max-width: 760px; }
+  .pagehead .right { margin-left: auto; display: flex; gap: 8px; }
+  .summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .summary .card { padding: 14px 18px; }
+  .summary .k { color: var(--muted); font-size: 12px; }
+  .summary .v { font: 700 20px/1.3 var(--head); margin-top: 2px; }
+  .filters { display: none; flex-wrap: wrap; gap: 14px; align-items: end; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+  .filters.show { display: flex; }
+  .filters label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--muted); }
+  .filters input[type=number] { width: 120px; background: var(--panel2); color: var(--text); border: 1px solid var(--line2);
+                                border-radius: 8px; padding: 7px 9px; font: inherit; }
+  .filters .chk { flex-direction: row; align-items: center; gap: 7px; padding-bottom: 8px; }
+  .tablebar { display: flex; align-items: center; gap: 10px; padding: 14px 20px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 13px; flex-wrap: wrap; }
+  .tablebar .grow { flex: 1; }
+  footer { color: var(--dim); font-size: 12px; margin: 22px 2px 8px; max-width: 900px; }
+
+  /* ---------- lock ---------- */
+  #lock { display: none; position: fixed; inset: 0; z-index: 20; place-items: center; padding: 16px;
+          background: radial-gradient(700px 400px at 50% 0%, rgba(242, 184, 29, .12), transparent 70%), var(--bg); }
+  #lock form { width: 100%; max-width: 380px; background: var(--panel); border: 1px solid var(--line2); border-radius: 16px; padding: 28px; }
+  #lock .mark { width: 48px; height: 48px; border-radius: 12px; display: grid; place-items: center; margin-bottom: 14px;
+                background: linear-gradient(145deg, #f7cf55, #b9820c); color: var(--accent-ink); font: 700 20px var(--head); }
+  #lock h2 { margin: 0 0 4px; font: 700 20px var(--head); }
+  #lock p { color: var(--muted); margin: 0 0 18px; }
+  #lock input[type=password] { width: 100%; background: var(--panel2); color: var(--text); border: 1px solid var(--line2);
+                               border-radius: 9px; padding: 10px 12px; font: inherit; margin-bottom: 12px; }
+  #lock label { display: flex; gap: 7px; align-items: center; color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+  #lock button { width: 100%; padding: 10px; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 9px; font-weight: 600; }
+  #lock .err { color: var(--bad); min-height: 1.4em; margin: 12px 0 0; }
+  body.locked #lock { display: grid; }
+  body.locked .app { display: none; }
+
+  /* ---------- small screens ---------- */
+  @media (max-width: 1100px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 860px) {
+    .app { grid-template-columns: minmax(0, 1fr); }
+    .hide-sm { display: none; }
+    .pagehead .right { margin-left: 0; }
+    aside { position: fixed; z-index: 30; left: 0; top: 0; width: 260px; transform: translateX(-100%); transition: transform .2s; }
+    body.menu aside { transform: none; box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .55); }
+    .menubtn { display: inline-flex; }
+    .topbar { padding: 10px 16px; flex-wrap: wrap; }
+    .topinfo .sync { display: none; }
+    .content { padding: 16px; }
+    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 16px; }
+    .stat:nth-child(3) { border-left: 0; padding-left: 0; }
+    .hero .in { padding: 20px; }
+    .hero .actions { margin-left: 0; }
+    .summary { gap: 8px; }
+    .summary .card { padding: 10px 12px; }
+    .summary .v { font-size: 15px; }
+  }
+  @media (max-width: 520px) { .search { order: 3; flex-basis: 100%; max-width: none; } .topinfo { margin-left: auto; } }
 </style>
 </head>
 <body>
-<header>
-  <h1><span>⚖</span> Forever Flip Finder</h1>
-  <div class="status" id="status">Loading…</div>
-</header>
 
-<form id="lock">
-  <h2>Locked</h2>
-  <p>Enter the password to see the flips.</p>
-  <input type="password" id="pw" autocomplete="current-password" placeholder="Password" required>
-  <label><input type="checkbox" id="remember" checked> Remember on this device</label>
-  <button type="submit" id="unlockbtn">Unlock</button>
-  <p class="err" id="lockerr"></p>
-</form>
+<div id="lock">
+  <form id="lockform">
+    <div class="mark">F</div>
+    <h2>Locked</h2>
+    <p>Enter the password to see your flips.</p>
+    <input type="password" id="pw" autocomplete="current-password" placeholder="Password" required>
+    <label><input type="checkbox" id="remember" checked> Remember on this device</label>
+    <button type="submit" id="unlockbtn">Unlock</button>
+    <p class="err" id="lockerr"></p>
+  </form>
+</div>
 
-<main>
-  <div class="tabs">
-    <button class="tab active" data-kind="reset">Underpriced (reset)<span class="count" id="c-reset"></span></button>
-    <button class="tab" data-kind="arbitrage">Between auction houses<span class="count" id="c-arbitrage"></span></button>
-    <button class="tab" data-kind="vendor">Below vendor price<span class="count" id="c-vendor"></span></button>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-home" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+  <symbol id="i-reset" viewBox="0 0 24 24"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.5"/></symbol>
+  <symbol id="i-arb" viewBox="0 0 24 24"><path d="M7 4 3 8l4 4"/><path d="M3 8h14"/><path d="m17 12 4 4-4 4"/><path d="M21 16H7"/></symbol>
+  <symbol id="i-vendor" viewBox="0 0 24 24"><circle cx="9" cy="9" r="6"/><path d="M15.5 9.5a6 6 0 1 1-6 6"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-sync" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
+</svg>
+
+<div class="app">
+  <aside>
+    <div class="brand"><div class="mark">F</div><div><b>Flip Finder</b><small>WoW: Forever</small></div></div>
+    <nav id="nav">
+      <a href="#overview" data-page="overview"><svg class="i"><use href="#i-home"/></svg>Overview</a>
+      <div class="group" data-group="flips">
+        <button class="navlabel" type="button">Flipping<svg class="i chev"><use href="#i-chev"/></svg></button>
+        <div class="items">
+          <a href="#reset" data-page="reset"><svg class="i"><use href="#i-reset"/></svg>Underpriced<span class="n" id="n-reset"></span></a>
+          <a href="#arbitrage" data-page="arbitrage"><svg class="i"><use href="#i-arb"/></svg>Between houses<span class="n" id="n-arbitrage"></span></a>
+          <a href="#vendor" data-page="vendor"><svg class="i"><use href="#i-vendor"/></svg>Below vendor<span class="n" id="n-vendor"></span></a>
+        </div>
+      </div>
+    </nav>
+    <div class="sidefoot" id="sidefoot"></div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <button class="menubtn" id="menubtn" aria-label="Menu"><svg class="i"><use href="#i-menu"/></svg></button>
+      <label class="search"><svg class="i"><use href="#i-search"/></svg><input id="search" type="search" placeholder="Search items…" autocomplete="off"></label>
+      <div class="topinfo">
+        <span class="sync" id="sync"></span>
+        <div class="seg" id="factionseg" title="Which auction houses to include"></div>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- overview -->
+      <section id="page-overview">
+        <div class="hero">
+          <svg class="mtn" viewBox="0 0 1200 300" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M0 300V190l90-60 70 40 110-95 90 70 80-45 120 100 90-55 100 65 120-110 110 85 90-40 130 75V300Z" fill="#0d0e12"/>
+            <path d="M0 300v-60l130-50 120 45 150-70 140 60 160-55 130 50 170-65 200 75V300Z" fill="#0a0a0d"/>
+          </svg>
+          <div class="in">
+            <div class="top">
+              <div class="crest">F</div>
+              <div><h1>Forever Flip Finder</h1><p id="herosub">Gold flips on the WoW: Forever auction houses, updated every hour.</p></div>
+              <div class="actions" id="heroactions"></div>
+            </div>
+            <div class="stats" id="stats"></div>
+          </div>
+        </div>
+        <div class="grid">
+          <div class="card">
+            <div class="hd"><h2>Best flips right now</h2><p class="sub">The most profitable flips across all three strategies, with your saved filters.</p></div>
+            <div class="tablewrap" style="margin-top:12px"><table id="toptbl"><tbody></tbody></table></div>
+          </div>
+          <div class="stack">
+            <div class="card"><div class="hd"><h2>Auction houses</h2><p class="sub" id="housesub"></p></div><div class="bd"><div class="houses" id="houses"></div></div></div>
+            <div class="card"><div class="hd"><h2>Data</h2></div><div class="bd"><div class="kv" id="datakv"></div></div></div>
+            <div class="card"><div class="hd"><h2>How to use it</h2></div><div class="bd">
+              <ul class="tips">
+                <li><b>Underpriced:</b> buy listings far below the normal price, relist just under the next one.</li>
+                <li><b>Between houses:</b> buy in one house, sell in another your character can use.</li>
+                <li><b>Below vendor:</b> buy and sell straight to a vendor. No risk.</li>
+                <li>Prices are up to an hour old, so check the auction house before buying.</li>
+              </ul>
+            </div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- one page per strategy (shared markup, filled by showPage) -->
+      <section id="page-flips" hidden>
+        <div class="pagehead">
+          <div><h1 id="ptitle"></h1><p id="phelp"></p></div>
+          <div class="right"><button class="btn" id="filterbtn">Filters</button></div>
+        </div>
+        <div class="summary" id="summary"></div>
+        <div class="card">
+          <div class="filters" id="filters">
+            <label data-for="reset arbitrage vendor">Min profit (gold)<input type="number" id="f-min_profit" step="0.1" min="0"></label>
+            <label data-for="reset arbitrage">Min ROI %<input type="number" id="f-min_roi" step="1" min="0"></label>
+            <label data-for="reset">Buy below % of market<input type="number" id="f-buy_pct" step="1" min="10" max="100"></label>
+            <label data-for="reset arbitrage">Min snapshots seen<input type="number" id="f-min_seen" step="1" min="1"></label>
+            <label data-for="reset arbitrage">Min avg listings<input type="number" id="f-min_listings" step="1" min="0"></label>
+            <label data-for="reset arbitrage" title="Don't buy more than sells in this many days (once sales have been tracked for 12 h)">Days to sell<input type="number" id="f-sell_days" step="0.5" min="0.5"></label>
+            <label class="chk" data-for="arbitrage"><input type="checkbox" id="f-include_alt"> Include routes that need an alt on the other faction</label>
+            <button class="btn" id="resetfilters" type="button">Reset to defaults</button>
+          </div>
+          <div class="tablebar"><span id="totals"></span><span class="grow"></span><span>Click a row for its price history</span></div>
+          <div class="tablewrap"><table id="tbl"><thead></thead><tbody></tbody></table></div>
+        </div>
+      </section>
+
+      <footer>
+        Prices per unit. Market = median over the last 7 days of the cheapest-25 % price in each hourly snapshot.
+        Profit is after the AH cut (5 % faction, 15 % Blackwater). Listing deposits are refunded on sale and are not subtracted.
+        Sells/day is an estimate from auctions that vanished between snapshots while they still had hours left (cancelled auctions count too).
+      </footer>
+    </div>
   </div>
-  <p class="help" id="help"></p>
-
-  <div class="filters" id="filters">
-    <label>Search item<input type="text" id="f-search" placeholder="e.g. shard"></label>
-    <label data-for="reset arbitrage vendor">Min profit (gold)<input type="number" id="f-min_profit" step="0.1" min="0"></label>
-    <label data-for="reset arbitrage">Min ROI %<input type="number" id="f-min_roi" step="1" min="0"></label>
-    <label data-for="reset">Buy below % of market<input type="number" id="f-buy_pct" step="1" min="10" max="100"></label>
-    <label data-for="reset arbitrage">Min snapshots seen<input type="number" id="f-min_seen" step="1" min="1"></label>
-    <label data-for="reset arbitrage">Min avg listings<input type="number" id="f-min_listings" step="1" min="0"></label>
-    <label data-for="reset arbitrage" title="Don't buy more than sells in this many days (once sales have been tracked for 12 h)">Days to sell<input type="number" id="f-sell_days" step="0.5" min="0.5"></label>
-    <label class="chk" data-for="arbitrage"><input type="checkbox" id="f-include_alt"> Include routes that need an Alliance alt</label>
-    <label class="chk" data-for="reset arbitrage vendor"><input type="checkbox" id="f-all"> Show all houses</label>
-    <button id="refresh">Reload data</button>
-  </div>
-
-  <div class="totals" id="totals"></div>
-  <div class="tablewrap"><table id="tbl"><thead></thead><tbody></tbody></table></div>
-
-  <footer>
-    Prices per unit. Market = median over the last 7 days of the cheapest-25 % price in each hourly snapshot.
-    Profit is after the AH cut (5 % faction, 15 % Blackwater). Listing deposits are refunded on sale and are not subtracted.
-    Sells/day is an estimate from auctions that vanished between snapshots while they still had hours left (cancelled auctions count too).
-    Snapshots are about an hour old, so cheap listings may already be gone. Click a row for its price history.
-  </footer>
-</main>
+</div>
 
 <script src="flips.js"></script>
 <script>
@@ -135,31 +355,35 @@ const DEFAULTS = {
   arbitrage: { min_profit: 0.5, min_roi: 20, min_seen: 3, min_listings: 2, sell_days: 2 },
   vendor:    { min_profit: 0.01 },
 };
-const HELP = {
-  reset: "Listings far below the item's normal price in the same auction house. Buy them, relist just under the next listing (or at market). Higher confidence = more price history.",
-  arbitrage: "Buy in one auction house and sell in another. Horde and Blackwater (neutral) can both be used by your Horde character, so those routes need no alt.",
-  vendor: "Listings priced below what a vendor pays. Buy and sell to any vendor right away, no risk.",
+const PAGES = {
+  reset: { title: "Underpriced", tag: "Underpriced", icon: "i-reset",
+    help: "Listings far below the item's normal price in the same auction house. Buy them and relist just under the next listing (or at market). More history = higher confidence." },
+  arbitrage: { title: "Between auction houses", tag: "Between houses", icon: "i-arb",
+    help: "Buy in one auction house and sell in another. A Horde character can use both the Horde and the neutral Blackwater house, so those routes need no alt." },
+  vendor: { title: "Below vendor price", tag: "Below vendor", icon: "i-vendor",
+    help: "Listings priced below what a vendor pays. Buy them and sell to any vendor straight away. No risk, as long as they're still there." },
 };
 const COLS = {
   reset: [
-    ["name", "Item", "l"], ["house", "House", "l"], ["buy_units", "Units"], ["buy_upto", "Buy up to", "m"],
-    ["cost", "Cost", "m"], ["sell_at", "Sell at", "m"], ["market", "Market", "m"], ["profit", "Profit", "m p"],
+    ["name", "Item", "item"], ["house", "House", "l"], ["below", "Below market", "below"], ["buy_units", "Units"],
+    ["buy_upto", "Buy up to", "m"], ["cost", "Cost", "m"], ["sell_at", "Sell at", "m"], ["profit", "Profit", "m p"],
     ["roi", "ROI", "r"], ["sells_day", "Sells/day", "v"], ["confidence", "Data", "conf"],
   ],
   arbitrage: [
-    ["name", "Item", "l"], ["buy_house", "Buy in", "l"], ["sell_house", "Sell in", "l"], ["buy_units", "Units"],
+    ["name", "Item", "item"], ["buy_house", "Buy in", "l"], ["sell_house", "Sell in", "l"], ["buy_units", "Units"],
     ["buy_upto", "Buy up to", "m"], ["cost", "Cost", "m"], ["sell_at", "Sell at", "m"], ["profit", "Profit", "m p"],
     ["roi", "ROI", "r"], ["sells_day", "Sells/day", "v"], ["route", "Route", "route"], ["confidence", "Data", "conf"],
   ],
   vendor: [
-    ["name", "Item", "l"], ["house", "House", "l"], ["buy_units", "Units"], ["buy_upto", "Buy up to", "m"],
+    ["name", "Item", "item"], ["house", "House", "l"], ["buy_units", "Units"], ["buy_upto", "Buy up to", "m"],
     ["cost", "Cost", "m"], ["sell_at", "Vendor pays", "m"], ["profit", "Profit", "m p"], ["roi", "ROI", "r"],
   ],
 };
+const KINDS = ["reset", "arbitrage", "vendor"];
 const MAX_ROWS = 500;
 const SHARDS = 64;
 
-let kind = "reset", D = null, rows = [], sortKey = "profit", sortAsc = false, openRow = null;
+let page = "overview", kind = "reset", D = null, rows = [], all = {}, sortKey = "profit", sortAsc = false, openRow = null;
 const shardCache = new Map();
 const $ = (id) => document.getElementById(id);
 
@@ -174,17 +398,24 @@ function money(c) {
   return `<span class="money">${neg ? "-" : ""}${out.trim()}</span>`;
 }
 const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
-const ago = (ts) => { const m = Math.round((Date.now() / 1000 - ts) / 60); return m < 60 ? `${m} min ago` : `${Math.round(m / 6) / 10} h ago`; };
+const ago = (ts) => {
+  const m = Math.max(0, Math.round((Date.now() / 1000 - ts) / 60));
+  return m < 60 ? `${m} min ago` : m < 48 * 60 ? `${Math.round(m / 6) / 10} h ago` : `${Math.round(m / 1440)} days ago`;
+};
+const short = (house) => String(house || "").replace(" Auction House", "");
+const cap = (s) => s ? s[0].toUpperCase() + s.slice(1) : s;
 
 // ---------- filters ----------
+function prefs() { try { return JSON.parse(localStorage.getItem("ff-prefs") || "{}"); } catch (e) { return {}; } }
+function setPref(k, v) { const p = prefs(); p[k] = v; try { localStorage.setItem("ff-prefs", JSON.stringify(p)); } catch (e) {} }
 function savedFilters(k) {
   try { return JSON.parse(localStorage.getItem("ff-" + k) || "{}"); } catch (e) { return {}; }
 }
+function filtersFor(k) { return { ...DEFAULTS[k], ...savedFilters(k) }; }
 function loadFilters() {
-  const f = { ...DEFAULTS[kind], ...savedFilters(kind) };
+  const f = filtersFor(kind);
   for (const k of ["min_profit", "min_roi", "buy_pct", "min_seen", "min_listings", "sell_days"]) if (f[k] !== undefined) $("f-" + k).value = f[k];
   $("f-include_alt").checked = !!f.include_alt;
-  $("f-all").checked = !!f.all;
   document.querySelectorAll("#filters [data-for]").forEach((el) => {
     el.style.display = el.dataset.for.split(" ").includes(kind) ? "" : "none";
   });
@@ -193,7 +424,6 @@ function readFilters() {
   const f = {};
   for (const k of Object.keys(DEFAULTS[kind])) f[k] = $("f-" + k).value;
   if (kind === "arbitrage") f.include_alt = $("f-include_alt").checked;
-  f.all = $("f-all").checked;
   try { localStorage.setItem("ff-" + kind, JSON.stringify(f)); } catch (e) {}
   return f;
 }
@@ -207,8 +437,10 @@ function toCalc(k, f) {
     include_alt: !!f.include_alt,
   };
 }
-const factionFor = (f) => (f.all ? null : D.status.faction);
-const compute = (k, f) => FLIPS[k](D, toCalc(k, f), factionFor(f));
+const showAll = () => prefs().houses === "all";
+const faction = () => (showAll() ? null : D.status.faction);
+const compute = (k, f) => FLIPS[k](D, toCalc(k, f), faction()).map((r) => ({ ...r, kind: k,
+  below: r.market ? 1 - r.buy_upto / r.market : null }));
 
 // ---------- password lock ----------
 // On GitHub the data files are encrypted (see export.py). The key is derived from the
@@ -250,7 +482,7 @@ function showLock(raw, msg) {
   $("unlockbtn").disabled = false; $("unlockbtn").textContent = "Unlock";
   $("pw").focus();
 }
-$("lock").addEventListener("submit", async (e) => {
+$("lockform").addEventListener("submit", async (e) => {
   e.preventDefault();
   if (!pending) return;
   $("unlockbtn").disabled = true; $("unlockbtn").textContent = "Unlocking…";
@@ -270,36 +502,135 @@ async function loadData() {
     if (!r.ok) throw new Error("HTTP " + r.status);
     raw = await r.json();
   } catch (e) {
-    $("status").innerHTML = `<span class="pill err">Couldn't load data: ${esc(e.message)}</span>`;
+    $("sync").innerHTML = `<span class="pill err">Couldn't load data: ${esc(e.message)}</span>`;
     return;
   }
   try {
     D = prepare(await unlock(raw));
   } catch (e) {
     if (e === LOCKED || e === WRONG) return showLock(raw, e === WRONG ? "Wrong password, try again." : "");
-    $("status").innerHTML = `<span class="pill err">Couldn't read data: ${esc(e.message)}</span>`;
+    $("sync").innerHTML = `<span class="pill err">Couldn't read data: ${esc(e.message)}</span>`;
     return;
   }
   D.encrypted = !!raw.enc;
   document.body.classList.remove("locked");
   $("lockerr").textContent = "";
   shardCache.clear();
-  renderStatus();
-  recompute();
+  refresh();
 }
 
-function recompute() {
+// everything that depends on the data or the faction switch
+function refresh() {
   if (!D) return;
-  rows = compute(kind, readFilters());
-  $("c-" + kind).textContent = rows.length;
-  for (const k of Object.keys(DEFAULTS)) if (k !== kind) $("c-" + k).textContent = compute(k, { ...DEFAULTS[k], ...savedFilters(k) }).length;
-  openRow = null;
-  render();
+  for (const k of KINDS) {
+    all[k] = compute(k, filtersFor(k));
+    $("n-" + k).textContent = all[k].length || "";
+  }
+  renderChrome();
+  if (page === "overview") renderOverview();
+  else { rows = compute(kind, readFilters()); all[kind] = rows; $("n-" + kind).textContent = rows.length || ""; openRow = null; renderPage(); }
 }
 
-function render() {
+// ---------- chrome: top bar, sidebar footer ----------
+function renderChrome() {
+  const s = D.status;
+  const seg = $("factionseg");
+  seg.innerHTML = `<button data-h="mine" class="${showAll() ? "" : "on"}">${esc(cap(s.faction))}</button><button data-h="all" class="${showAll() ? "on" : ""}">All houses</button>`;
+  const parts = [];
+  if (s.demo) parts.push('<span class="pill demo">Demo data</span>');
+  if (s.last_error) parts.push(`<span class="pill err" title="${esc(s.last_error)}">Last fetch failed</span>`);
+  if (s.running) parts.push("Collecting…");
+  else if (s.live && s.next_run) parts.push(`<svg class="i" style="vertical-align:-4px;color:var(--blue)"><use href="#i-sync"/></svg> Next fetch in <b>${Math.max(0, Math.round((s.next_run - Date.now() / 1000) / 60))} min</b>`);
+  else if (s.snapshots && s.snapshots.last) parts.push(`<svg class="i" style="vertical-align:-4px;color:var(--blue)"><use href="#i-sync"/></svg> Updated <b>${ago(s.snapshots.last)}</b>`);
+  $("sync").innerHTML = parts.join(" ");
+
+  const foot = [
+    ["Region", `${esc(s.region)} · ${esc(s.ruleset_name)}`],
+    ["History", s.snapshots && s.snapshots.n ? `${s.snapshots.n} h` : "none yet"],
+    ["Updates", s.live ? "every hour (this PC)" : "every hour"],
+  ];
+  $("sidefoot").innerHTML = foot.map(([k, v]) => `<div class="row"><span>${k}</span><span>${v}</span></div>`).join("") +
+    `<div class="row" style="margin-top:10px">${s.live ? '<button class="btn" id="fetchnow">Fetch now</button>' : ""}${D.encrypted ? '<button class="btn" id="lockbtn" title="Forget the password on this device">Lock</button>' : ""}</div>`;
+  if ($("lockbtn")) $("lockbtn").onclick = () => { forgetKey(); D = null; loadData(); };
+  const b = $("fetchnow");
+  if (b) b.onclick = async () => {
+    b.disabled = true; b.textContent = "Fetching…";
+    await fetch("api/collect", { method: "POST" });
+    const poll = setInterval(async () => {
+      const r = await (await fetch("api/status")).json();
+      if (!r.running) { clearInterval(poll); loadData(); }
+    }, 5000);
+  };
+}
+
+// ---------- overview ----------
+function itemCell(r) {
+  const q = esc(r.quality || "common");
+  return `<td class="l"><div class="item"><span class="ico q-${q}">${esc((r.name || "?")[0])}</span><div>` +
+    `<div class="nm q-${q}">${esc(r.name)}</div></div><span class="acts">` +
+    `<button class="mini" data-copy="${esc(r.name)}" title="Copy name for the AH search box">copy</button>` +
+    `<a class="mini" href="https://www.wowhead.com/classic/item=${r.item_id}" target="_blank" rel="noopener">wowhead</a></span></div></td>`;
+}
+
+function renderOverview() {
+  const s = D.status;
+  const usable = [...D.houses.values()].filter((h) => accessible(h, faction()));
+  let units = 0, auctions = 0;
+  const per = new Map();
+  for (const [hid, , lad] of D.list) {
+    const p = per.get(hid) || { units: 0, items: 0 }; p.items++;
+    for (const [, q, n] of lad) { p.units += q; if (usable.some((h) => h.id === hid)) { units += q; auctions += n; } }
+    per.set(hid, p);
+  }
+  const flips = KINDS.flatMap((k) => all[k]);
+  const total = flips.reduce((a, r) => a + r.profit, 0);
+  const best = flips.slice().sort((a, b) => b.profit - a.profit)[0];
+  const hname = showAll() ? "All houses" : `${cap(s.faction)} · ${s.ruleset_name}`;
+  $("herosub").textContent = `Your WoW: Forever flips on ${s.region} ${s.ruleset_name}, updated every hour from Blizzard's auction data.`;
+  $("heroactions").innerHTML = `<a class="btn primary" href="#reset" style="text-decoration:none">Find flips →</a>`;
+  $("stats").innerHTML = [
+    ["Auction house", hname, `${s.region} · ${s.snapshots && s.snapshots.last ? "updated " + ago(s.snapshots.last) : "no data yet"}`],
+    ["Items listed", units.toLocaleString("en"), `${auctions.toLocaleString("en")} auctions right now`],
+    ["Flips found", flips.length.toLocaleString("en"), `${all.reset.length} underpriced · ${all.arbitrage.length} between · ${all.vendor.length} vendor`],
+    ["Potential profit", money(total), best ? `best: ${esc(best.name)}` : "no flips yet"],
+  ].map(([k, v, d]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`).join("");
+
+  const top = flips.slice().sort((a, b) => b.profit - a.profit).slice(0, 10);
+  const tb = $("toptbl").querySelector("tbody");
+  if (!top.length) {
+    const n = s.snapshots && s.snapshots.n;
+    tb.innerHTML = `<tr><td class="empty"><b>No flips yet</b>${!n ? "Waiting for the first fetch." :
+      n < 3 ? `Only ${n} hour(s) of history so far. Underpriced and between-house flips need about 3 hours.` : "Nothing matches your filters right now."}</td></tr>`;
+  } else {
+    tb.innerHTML = top.map((r, i) => `<tr data-top="${i}">${itemCell(r)}<td class="l hide-sm"><span class="tag ${r.kind}">${esc(PAGES[r.kind].tag)}</span></td>` +
+      `<td class="l hide-sm" style="color:var(--muted)">${esc(short(r.house || r.buy_house + " → " + short(r.sell_house)))}</td>` +
+      `<td class="profit">${money(r.profit)}</td><td class="roi">${Math.round(r.roi * 100)}%</td></tr>`).join("");
+    tb._list = top;
+  }
+
+  $("housesub").textContent = showAll() ? "Showing every house, including ones that need an alt." : `Houses a ${cap(s.faction)} character can use are included.`;
+  $("houses").innerHTML = [...D.houses.values()].map((h) => {
+    const p = per.get(h.id) || { units: 0, items: 0 };
+    const on = accessible(h, faction());
+    const color = h.neutral ? "var(--accent)" : /horde/i.test(h.name) ? "#e05252" : /alliance/i.test(h.name) ? "#4f8cff" : "var(--muted)";
+    return `<div class="house ${on ? "" : "off"}"><span class="dot" style="background:${color}"></span><b>${esc(short(h.name))}</b>` +
+      `<span class="meta">${p.items.toLocaleString("en")} items<br>${p.units.toLocaleString("en")} units</span></div>`;
+  }).join("") || `<div style="color:var(--muted)">No auction houses yet.</div>`;
+
+  const lr = s.last_run;
+  $("datakv").innerHTML = [
+    ["Region", `${esc(s.region)} · ${esc(s.ruleset_name)}`],
+    ["History", s.snapshots && s.snapshots.n ? `${s.snapshots.n} hourly snapshots` : "none yet"],
+    ["Last update", s.snapshots && s.snapshots.last ? ago(s.snapshots.last) : "–"],
+    ["Last fetch", lr ? (lr.ok ? "OK" : `<span style="color:var(--bad)" title="${esc(lr.message)}">failed</span>`) : "–"],
+    ["Sales tracking", s.snapshots && s.snapshots.n >= 13 ? "active" : "starts after 12 h"],
+  ].map(([k, v]) => `<span>${k}</span><span>${v}</span>`).join("");
+}
+
+// ---------- strategy pages ----------
+function renderPage() {
   const cols = COLS[kind];
-  const q = $("f-search").value.trim().toLowerCase();
+  const q = $("search").value.trim().toLowerCase();
   let list = rows.filter((r) => !q || r.name.toLowerCase().includes(q));
   list.sort((a, b) => {
     const x = a[sortKey], y = b[sortKey];
@@ -307,40 +638,40 @@ function render() {
     return sortAsc ? c : -c;
   });
   const total = list.length;
+  const tp = list.reduce((a, r) => a + r.profit, 0), tc = list.reduce((a, r) => a + r.cost, 0);
+  $("summary").innerHTML = [["Flips", total.toLocaleString("en")], ["Total cost", money(tc)], ["Potential profit", money(tp)]]
+    .map(([k, v]) => `<div class="card"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
   list = list.slice(0, MAX_ROWS);
+  $("totals").innerHTML = total > MAX_ROWS ? `Showing the top ${MAX_ROWS} of ${total}` : `${total} flip${total === 1 ? "" : "s"}${q ? ` matching “${esc(q)}”` : ""}`;
 
   $("tbl").querySelector("thead").innerHTML = "<tr>" + cols.map(([k, label, t]) =>
-    `<th data-k="${k}" class="${(t || "").includes("l") || t === "route" || t === "conf" ? "l" : ""} ${sortKey === k ? "sorted" + (sortAsc ? " asc" : "") : ""}">${label}</th>`).join("") + "</tr>";
+    `<th data-k="${k}" class="${["l", "item", "route", "conf"].includes(t) ? "l" : ""} ${sortKey === k ? "sorted" + (sortAsc ? " asc" : "") : ""}">${label}</th>`).join("") + "</tr>";
 
   const tb = $("tbl").querySelector("tbody");
   if (!list.length) {
-    const s = D && D.status.snapshots;
-    const msg = !s || !s.n ? "No data yet. The first collection takes a minute or two."
-      : (s.n < 3 && kind !== "vendor") ? `Only ${s.n} snapshot(s) so far. Flips need at least ${$("f-min_seen").value || 3} hours of history (or lower "Min snapshots seen").`
-      : "No flips match these filters right now.";
-    tb.innerHTML = `<tr><td class="empty" colspan="${cols.length}">${msg}</td></tr>`;
-    $("totals").textContent = "";
+    const s = D.status.snapshots;
+    const msg = !s || !s.n ? "Waiting for the first fetch. It takes a minute or two."
+      : (s.n < 3 && kind !== "vendor") ? `Only ${s.n} hour(s) of history so far. These flips need at least ${$("f-min_seen").value || 3} hours (or lower "Min snapshots seen" under Filters).`
+      : q ? "No flips match your search." : "No flips match these filters right now. Check back after the next update.";
+    tb.innerHTML = `<tr><td class="empty" colspan="${cols.length}"><b>No flips</b>${msg}</td></tr>`;
     return;
   }
 
   tb.innerHTML = list.map((r, i) => "<tr data-i='" + i + "'>" + cols.map(([k, , t]) => {
     const v = r[k];
-    if (k === "name") return `<td class="l"><span class="q-${esc(r.quality || "common")}">${esc(v)}</span>` +
-      `<button class="copy" data-copy="${esc(v)}" title="Copy name for the AH search box">copy</button>` +
-      `<a class="wh" href="https://www.wowhead.com/classic/item=${r.item_id}" target="_blank" rel="noopener">wowhead</a></td>`;
+    if (t === "item") return itemCell(r);
     if ((t || "").startsWith("m")) return `<td class="${t.includes("p") ? "profit" : ""}">${money(v)}</td>`;
     if (t === "r") return `<td class="roi">${Math.round(v * 100)}%</td>`;
+    if (t === "below") return v == null ? "<td class='muted'>–</td>" :
+      `<td><span class="below">${Math.round(v * 100)}%<span class="bar"><i style="width:${Math.min(100, Math.max(4, v * 100))}%"></i></span></span></td>`;
     if (t === "v") return v == null ? `<td class="muted" title="Not enough sales tracking yet (needs 12 h)">–</td>`
       : `<td title="Estimated: auctions that disappeared while they still had hours left">${v.toLocaleString("en")}</td>`;
     if (t === "conf") return `<td class="l"><span class="conf ${v}" title="${r.seen} snapshots">${v}</span></td>`;
     if (t === "route") return `<td class="l route ${v.startsWith("Needs") ? "alt" : ""}">${esc(v)}</td>`;
-    if (t === "l") return `<td class="l">${esc(v).replace(" Auction House", "")}</td>`;
+    if (t === "l") return `<td class="l">${esc(short(v))}</td>`;
     return `<td>${typeof v === "number" ? v.toLocaleString("en") : esc(v)}</td>`;
   }).join("") + "</tr>").join("");
   tb._list = list;
-
-  const tp = list.reduce((a, r) => a + r.profit, 0), tc = list.reduce((a, r) => a + r.cost, 0);
-  $("totals").innerHTML = `${total} flips${total > MAX_ROWS ? ` (showing the top ${MAX_ROWS})` : ""} · total cost ${money(tc)} · total potential profit ${money(tp)}`;
 }
 
 // ---------- price history ----------
@@ -363,24 +694,26 @@ async function toggleDetail(tr) {
   const house = r.house || r.sell_house;
   const d = document.createElement("tr");
   d.className = "detail";
-  d.innerHTML = `<td colspan="${COLS[kind].length}"><canvas></canvas><div class="legend">${esc(r.name)} in ${esc(house)}:
-    <b style="color:var(--accent)">— market (cheapest 25 %)</b> &nbsp; <b style="color:#6aa6ff">— lowest listing</b>
-    ${r.buy_house ? ` · buying in ${esc(r.buy_house)}` : ""}</div></td>`;
+  d.innerHTML = `<td colspan="${COLS[kind].length}"><canvas></canvas><div class="legend"><span>${esc(r.name)} in ${esc(short(house))}</span>
+    <span><i style="background:var(--accent)"></i>Market (cheapest 25 %)</span><span><i style="background:var(--blue)"></i>Lowest listing</span>
+    ${r.buy_house ? `<span>Buying in ${esc(short(r.buy_house))}</span>` : ""}</div></td>`;
   tr.after(d);
   drawChart(d.querySelector("canvas"), await loadHistory(r.house_id, r.item_id));
 }
 
 function drawChart(cv, hist) {
+  const css = getComputedStyle(document.documentElement), col = (v) => css.getPropertyValue(v).trim();
   const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
   cv.width = w * dpr; cv.height = h * dpr;
   const ctx = cv.getContext("2d"); ctx.scale(dpr, dpr);
-  if (hist.length < 2) { ctx.fillStyle = "#8b93a3"; ctx.fillText("Not enough history yet", 10, 20); return; }
-  const pad = { l: 70, r: 10, t: 10, b: 22 };
-  const xs = hist.map((p) => p.ts), all = hist.flatMap((p) => [p.market, p.min_price]);
-  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...all) * 0.95, y1 = Math.max(...all) * 1.05;
+  ctx.font = "12px Inter, system-ui"; ctx.fillStyle = col("--muted");
+  if (hist.length < 2) { ctx.fillText("Not enough history yet", 10, 20); return; }
+  const pad = { l: 70, r: 10, t: 10, b: 24 };
+  const xs = hist.map((p) => p.ts), allv = hist.flatMap((p) => [p.market, p.min_price]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...allv) * 0.95, y1 = Math.max(...allv) * 1.05;
   const X = (t) => pad.l + (t - x0) / (x1 - x0 || 1) * (w - pad.l - pad.r);
   const Y = (v) => h - pad.b - (v - y0) / (y1 - y0 || 1) * (h - pad.t - pad.b);
-  ctx.strokeStyle = "#2a2f3a"; ctx.fillStyle = "#8b93a3"; ctx.font = "11px system-ui"; ctx.lineWidth = 1;
+  ctx.strokeStyle = col("--line"); ctx.lineWidth = 1;
   for (let i = 0; i <= 3; i++) {
     const v = y0 + (y1 - y0) * i / 3, y = Y(v);
     ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke();
@@ -392,58 +725,71 @@ function drawChart(cv, hist) {
     ctx.fillText(label, f ? w - pad.r - ctx.measureText(label).width : pad.l, h - 6);
   });
   const line = (key, color) => {
-    ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.beginPath();
+    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath();
     hist.forEach((p, i) => (i ? ctx.lineTo : ctx.moveTo).call(ctx, X(p.ts), Y(p[key]))); ctx.stroke();
   };
-  line("min_price", "#6aa6ff"); line("market", "#c8a24a");
+  line("min_price", col("--blue")); line("market", col("--accent"));
 }
 
-// ---------- status ----------
-function renderStatus() {
-  const s = D.status, parts = [];
-  if (s.demo) parts.push('<span class="pill demo">DEMO DATA</span>');
-  parts.push(`<span class="pill">${esc(s.region)} · ${esc(s.ruleset_name)} · ${esc(s.faction[0].toUpperCase() + s.faction.slice(1))}</span>`);
-  if (s.snapshots && s.snapshots.n) parts.push(`${s.snapshots.n} h of history · data from ${ago(s.snapshots.last)}`);
-  if (s.running) parts.push("collecting…");
-  else if (s.live && s.next_run) parts.push(`next fetch in ${Math.max(0, Math.round((s.next_run - Date.now() / 1000) / 60))} min`);
-  else if (!s.live && !s.demo) parts.push("updates hourly");
-  if (s.last_error) parts.push(`<span class="pill err" title="${esc(s.last_error)}">last fetch failed</span>`);
-  if (s.live) parts.push('<button id="fetchnow">Fetch now</button>');
-  if (D.encrypted) parts.push('<button id="lockbtn" title="Forget the password on this device">Lock</button>');
-  $("status").innerHTML = parts.join(" ");
-  if ($("lockbtn")) $("lockbtn").onclick = () => { forgetKey(); D = null; loadData(); };
-  const b = $("fetchnow");
-  if (b) b.onclick = async () => {
-    b.disabled = true; b.textContent = "Fetching…";
-    await fetch("api/collect", { method: "POST" });
-    const poll = setInterval(async () => {
-      const r = await (await fetch("api/status")).json();
-      if (!r.running) { clearInterval(poll); loadData(); }
-    }, 5000);
-  };
+// ---------- navigation ----------
+function showPage(p) {
+  if (!PAGES[p]) p = "overview";
+  page = p;
+  document.querySelectorAll("#nav a").forEach((a) => a.classList.toggle("active", a.dataset.page === p));
+  $("page-overview").hidden = p !== "overview";
+  $("page-flips").hidden = p === "overview";
+  $("search").placeholder = p === "overview" ? "Search items in all flips…" : `Search ${PAGES[p].title.toLowerCase()} flips…`;
+  if (p !== "overview") {
+    if (kind !== p) { kind = p; sortKey = "profit"; sortAsc = false; }
+    $("ptitle").textContent = PAGES[p].title;
+    $("phelp").textContent = PAGES[p].help;
+    loadFilters();
+  }
+  document.body.classList.remove("menu");
+  refresh();
 }
+window.addEventListener("hashchange", () => showPage(location.hash.slice(1)));
 
 // ---------- events ----------
-document.querySelectorAll(".tab").forEach((t) => t.onclick = () => {
-  document.querySelectorAll(".tab").forEach((x) => x.classList.remove("active"));
-  t.classList.add("active"); kind = t.dataset.kind; $("help").textContent = HELP[kind];
-  sortKey = "profit"; sortAsc = false; loadFilters(); recompute();
+$("menubtn").onclick = () => document.body.classList.toggle("menu");
+document.querySelectorAll("#nav .group").forEach((g) => {
+  if ((prefs().closed || []).includes(g.dataset.group)) g.classList.add("closed");
+  g.querySelector(".navlabel").onclick = () => {
+    g.classList.toggle("closed");
+    setPref("closed", [...document.querySelectorAll("#nav .group.closed")].map((x) => x.dataset.group));
+  };
 });
-$("refresh").onclick = loadData;
-$("filters").addEventListener("change", (e) => { if (e.target.id !== "f-search") recompute(); });
-$("f-search").addEventListener("input", render);
-$("tbl").addEventListener("click", (e) => {
+document.addEventListener("click", (e) => {
+  if (document.body.classList.contains("menu") && !e.target.closest("aside") && !e.target.closest("#menubtn")) document.body.classList.remove("menu");
+});
+$("factionseg").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-h]"); if (!b) return;
+  setPref("houses", b.dataset.h); refresh();
+});
+$("filterbtn").onclick = () => { $("filters").classList.toggle("show"); $("filterbtn").classList.toggle("on"); };
+$("resetfilters").onclick = () => { try { localStorage.removeItem("ff-" + kind); } catch (e) {} loadFilters(); refresh(); };
+$("filters").addEventListener("change", () => refresh());
+$("search").addEventListener("input", () => {
+  if (page === "overview" && $("search").value.trim()) { location.hash = "#" + (["reset", "arbitrage", "vendor"].find((k) => all[k] && all[k].some((r) => r.name.toLowerCase().includes($("search").value.trim().toLowerCase()))) || "reset"); return; }
+  if (page !== "overview") renderPage();
+});
+document.addEventListener("click", (e) => {
   const cp = e.target.closest("[data-copy]");
   if (cp) { e.stopPropagation(); navigator.clipboard && navigator.clipboard.writeText(cp.dataset.copy); cp.textContent = "copied"; setTimeout(() => cp.textContent = "copy", 1000); return; }
   if (e.target.closest("a")) return;
-  const th = e.target.closest("th");
-  if (th) { const k = th.dataset.k; if (sortKey === k) sortAsc = !sortAsc; else { sortKey = k; sortAsc = false; } render(); return; }
-  const tr = e.target.closest("tbody tr[data-i]");
+  const top = e.target.closest("#toptbl tr[data-top]");
+  if (top) { const r = $("toptbl").querySelector("tbody")._list[+top.dataset.top]; $("search").value = r.name; location.hash = "#" + r.kind; return; }
+  const th = e.target.closest("#tbl th");
+  if (th) { const k = th.dataset.k; if (sortKey === k) sortAsc = !sortAsc; else { sortKey = k; sortAsc = false; } renderPage(); return; }
+  const tr = e.target.closest("#tbl tbody tr[data-i]");
   if (tr) toggleDetail(tr);
 });
 
-$("help").textContent = HELP[kind];
-loadFilters();
+page = PAGES[location.hash.slice(1)] ? location.hash.slice(1) : "overview";
+document.querySelectorAll("#nav a").forEach((a) => a.classList.toggle("active", a.dataset.page === page));
+$("page-overview").hidden = page !== "overview";
+$("page-flips").hidden = page === "overview";
+if (page !== "overview") { kind = page; $("ptitle").textContent = PAGES[page].title; $("phelp").textContent = PAGES[page].help; loadFilters(); }
 loadData();
 setInterval(loadData, 10 * 60000);   // new data arrives about once an hour
 </script>
