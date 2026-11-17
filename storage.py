@@ -86,7 +86,29 @@ CREATE TABLE IF NOT EXISTS items (
     found      INTEGER,
     fetched_ts INTEGER,
     icon       TEXT,      -- icon file name, e.g. inv_enchant_dustillusion; '' = not found
-    icon_ts    INTEGER    -- when the icon was last looked up
+    icon_ts    INTEGER,   -- when the icon was last looked up
+    vendor_buy INTEGER    -- what a vendor charges per unit, copper; only for known vendor reagents
+);
+
+-- crafting recipes from Blizzard's profession API, refreshed weekly
+CREATE TABLE IF NOT EXISTS recipes (
+    recipe_id    INTEGER PRIMARY KEY,
+    name         TEXT,
+    profession   TEXT,
+    category     TEXT,
+    crafted_item INTEGER,
+    crafted_qty  REAL
+);
+CREATE TABLE IF NOT EXISTS recipe_reagents (
+    recipe_id INTEGER,
+    item_id   INTEGER,
+    quantity  INTEGER
+);
+CREATE INDEX IF NOT EXISTS ix_reagents ON recipe_reagents (recipe_id);
+
+CREATE TABLE IF NOT EXISTS meta (
+    key   TEXT PRIMARY KEY,
+    value TEXT
 );
 
 CREATE TABLE IF NOT EXISTS runs (
@@ -101,7 +123,7 @@ CREATE TABLE IF NOT EXISTS runs (
 MIGRATIONS = {
     "snapshots": [("fingerprint", "TEXT"), ("gap", "INTEGER")],
     "market": [("sold_per_day", "REAL"), ("tracked_h", "REAL")],
-    "items": [("icon", "TEXT"), ("icon_ts", "INTEGER")],
+    "items": [("icon", "TEXT"), ("icon_ts", "INTEGER"), ("vendor_buy", "INTEGER")],
 }
 
 

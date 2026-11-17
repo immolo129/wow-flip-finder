@@ -73,13 +73,19 @@ For real data:
 3. Leave the black window open. It fetches right away and then every hour.
    The local version also has a "Fetch now" button.
 
-## The three tabs
+## The pages
 
 | Tab | What it finds | Risk |
 |---|---|---|
 | Underpriced (reset) | Listings far below the item's 7-day market price in the same house | Price can keep falling; check the chart |
 | Between auction houses | Cheaper in Horde, dearer in Blackwater (or the other way) | Blackwater takes 15 % instead of 5 % (already counted) |
 | Below vendor price | Listings cheaper than what a vendor pays | None, if it's still there |
+| Crafting profits | Recipes whose result sells for more than its reagents cost | You need the profession and the recipe; prices can move while you craft |
+
+**Crafting profits** uses Blizzard's recipe list for WoW: Forever (fetched weekly). Each reagent is
+priced at its cheapest source: the Horde or Blackwater market value, or a vendor for common vendor
+reagents like vials, thread and flux. The crafted item is priced at its market value after the AH cut.
+Click a recipe for the reagent breakdown.
 
 Flips need price history. "Below vendor price" works after the first fetch,
 the other two tabs after about 3 hours. Confidence goes from low to high as

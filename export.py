@@ -71,9 +71,17 @@ def latest(db, cfg, extra=None):
         if (m["house_id"], m["item_id"]) in ladders
     ]
     ids = {i for _, i in ladders}
-    # item id -> [name, quality, vendor price, icon file name or ""]
-    items = {str(r["item_id"]): [r["name"], (r["quality"] or "").lower(), r["sell_price"] or 0, r["icon"] or ""]
-             for r in db.query("SELECT item_id, name, quality, sell_price, icon FROM items") if r["item_id"] in ids}
+    # recipes whose result is on the auction house (others can't be priced)
+    reagents = defaultdict(list)
+    for r in db.query("SELECT recipe_id, item_id, quantity FROM recipe_reagents"):
+        reagents[r["recipe_id"]].append([r["item_id"], r["quantity"]])
+    recipes = [[r["recipe_id"], r["name"], r["profession"], r["crafted_item"], r["crafted_qty"], reagents[r["recipe_id"]]]
+               for r in db.query("SELECT * FROM recipes ORDER BY profession, name")
+               if r["crafted_item"] in ids and reagents[r["recipe_id"]]]
+    ids |= {i for rc in recipes for i, _ in rc[5]}
+    # item id -> [name, quality, vendor sell price, icon file name or "", vendor buy price (vendor reagents only)]
+    items = {str(r["item_id"]): [r["name"], (r["quality"] or "").lower(), r["sell_price"] or 0, r["icon"] or "", r["vendor_buy"] or 0]
+             for r in db.query("SELECT item_id, name, quality, sell_price, icon, vendor_buy FROM items") if r["item_id"] in ids}
     return {
         "status": status(db, cfg, extra),
         "houses": [[h["house_id"], h["name"], h["neutral"]]
@@ -83,6 +91,8 @@ def latest(db, cfg, extra=None):
         "markets": markets,
         # house, item, [[unit_price, quantity, auctions], ...] cheapest first
         "ladders": [[h, i, lad] for (h, i), lad in ladders.items()],
+        # recipe id, name, profession, crafted item, crafted quantity, [[reagent item, quantity], ...]
+        "recipes": recipes,
     }
 
 

@@ -12,7 +12,8 @@ const NEUTRAL_CUT = 0.15;   // AH cut on the neutral (Blackwater) house
 const MIN_TRACKED_H = 12;   // hours of sales tracking before sells/day is trusted
 
 function prepare(raw) {
-  const D = { status: raw.status, items: raw.items, houses: new Map(), ladders: new Map(), markets: new Map(), list: [] };
+  const D = { status: raw.status, items: raw.items, houses: new Map(), ladders: new Map(), markets: new Map(), list: [],
+              recipes: raw.recipes || [] };
   for (const [id, name, neutral] of raw.houses) D.houses.set(id, { id, name, neutral: !!neutral });
   for (const [h, i, lad] of raw.ladders) { D.ladders.set(h + ":" + i, lad); D.list.push([h, i, lad]); }
   for (const [h, i, market, seen, avg_listings, avg_quantity, sold_per_day, tracked_h] of raw.markets)
@@ -70,7 +71,7 @@ function buyLadder(ladder, maxPrice, maxUnits) {
 
 function itemOf(D, id) {
   const it = D.items[id] || [];
-  return { item_id: id, name: it[0] || `Item ${id}`, quality: it[1] || "", vendor: it[2] || 0, icon: it[3] || "" };
+  return { item_id: id, name: it[0] || `Item ${id}`, quality: it[1] || "", vendor: it[2] || 0, icon: it[3] || "", vendor_buy: it[4] || 0 };
 }
 
 function resetFlips(D, f, faction) {
@@ -171,4 +172,52 @@ function vendorFlips(D, f, faction) {
   return out.sort((a, b) => b.profit - a.profit);
 }
 
-const FLIPS = { reset: resetFlips, arbitrage: arbitrageFlips, vendor: vendorFlips };
+// Cheapest place to get one unit of a reagent: a vendor (known vendor reagents only) or the
+// market value in any house this character can use. -> { price, source, house_id } or null
+function reagentPrice(D, iid, faction, minSeen) {
+  const it = itemOf(D, iid);
+  let best = it.vendor_buy ? { price: it.vendor_buy, source: "Vendor", house_id: null } : null;
+  for (const h of D.houses.values()) {
+    if (!accessible(h, faction)) continue;
+    const m = D.markets.get(h.id + ":" + iid);
+    if (!m || m.seen < minSeen) continue;
+    if (!best || m.market < best.price) best = { price: m.market, source: h.name, house_id: h.id };
+  }
+  return best;
+}
+
+// Crafting: buy the reagents (cheapest source each), craft, sell the result at its market value
+// in the best house this character can use, after the AH cut.
+// f.profession filters to one profession ("" = all).
+function craftFlips(D, f, faction) {
+  const out = [];
+  for (const [rid, recipe, profession, made, qty, reagents] of D.recipes) {
+    if (f.profession && profession !== f.profession) continue;
+    let sell = null;
+    for (const h of D.houses.values()) {
+      if (!accessible(h, faction)) continue;
+      const m = D.markets.get(h.id + ":" + made);
+      if (!m || m.seen < f.min_seen) continue;
+      const net = m.market * (1 - cutOf(h)) * qty;
+      if (!sell || net > sell.net) sell = { h, m, net };
+    }
+    if (!sell) continue;
+    let cost = 0, missing = false;
+    const parts = reagents.map(([iid, n]) => {
+      const p = reagentPrice(D, iid, faction, f.min_seen);
+      if (!p) missing = true; else cost += p.price * n;
+      return { ...itemOf(D, iid), qty: n, price: p ? p.price : null, source: p ? p.source : null };
+    });
+    if (missing || cost <= 0) continue; // a reagent with no price: profit unknown
+    const profit = sell.net - cost, roi = profit / cost;
+    if (profit < f.min_profit || roi < f.min_roi) continue;
+    out.push({
+      ...itemOf(D, made), recipe_id: rid, recipe, profession, house: sell.h.name, house_id: sell.h.id,
+      crafted_qty: qty, cost, sell_at: sell.m.market, profit, roi, parts, seen: sell.m.seen,
+      sells_day: round1(sellsDay(sell.m)), confidence: confidenceOf(sell.m.seen),
+    });
+  }
+  return out.sort((a, b) => b.profit - a.profit);
+}
+
+const FLIPS = { reset: resetFlips, arbitrage: arbitrageFlips, vendor: vendorFlips, craft: craftFlips };

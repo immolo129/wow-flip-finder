@@ -39,13 +39,14 @@ There are no tests. To check a change, run demo mode, which needs no API keys an
 | `collector.py` | Parses auctions, stores snapshots, estimates sales, recomputes the 7-day market, prunes data, fetches item names |
 | `storage.py` | SQLite schema, migrations, and the thread-safe `DB` wrapper |
 | `demo.py` | Fake houses, items and snapshots for demo mode |
-| `static/flips.js` | The three flip strategies (`reset`, `arbitrage`, `vendor`) |
+| `static/flips.js` | The flip strategies (`reset`, `arbitrage`, `vendor`) and crafting profits (`craft`) |
 | `static/index.html` | The whole UI: one file, plain JS, no framework, no build step |
 
 ## Things that aren't obvious from the code
 - **Units.** All prices in the database, JSON and `flips.js` are integer copper per unit (1 g = 10 000 c). The page's filter boxes are in gold and whole percentages; `toCalc()` in `index.html` converts them to copper and fractions before calling `flips.js`.
 - **AH cut.** Faction houses take 5 % and the neutral Blackwater house takes 15 % (`FACTION_CUT`/`NEUTRAL_CUT` in `flips.js`). Profit figures already include the cut.
 - **Static site paths.** The page is served from a GitHub Pages subpath (`/<repo>/`), so `index.html` must use relative URLs (`data/latest.json`, not `/data/latest.json`).
+- **Recipes.** `collector.fetch_recipes` walks Blizzard's `static-forever` profession index → skill tiers → recipes once a week (`meta.recipes_ts`). Recipes that make no item (gear enchants) are skipped. Vendor-bought reagents are only the ids in `VENDOR_REAGENTS`, because Blizzard's item data has a buy price for every item without saying whether a vendor sells it.
 - **Item icons.** `items.icon` holds just the icon file name from Blizzard's item media endpoint (`'' ` = none found, retried weekly via `icon_ts`). The page builds the image URL itself: Blizzard's render server first, Wowhead's CDN as a backup, then a letter square (`itemIcon()` in `index.html`).
 - **Global names in `index.html`.** Scripts there are plain globals, so don't name functions after browser globals (`history`, `close`, `open`, `name`, `status`...). A function called `history` silently broke the price chart once.
 - **Testing the locked page headless.** Edge's `--virtual-time-budget` doesn't wait for the 600 000-round PBKDF2, so set `export.PBKDF2_ITER` low for browser tests.

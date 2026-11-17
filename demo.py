@@ -32,7 +32,7 @@ ITEMS = [
     (12808, "Essence of Undeath", "uncommon", 400, 60000, 30),
     (7076, "Essence of Earth", "uncommon", 400, 90000, 20),
     (12662, "Demonic Rune", "uncommon", 1000, 45000, 25),
-    (13444, "Major Mana Potion", "common", 1000, 18000, 120),
+    (13444, "Major Mana Potion", "common", 1000, 45000, 120),
     (13446, "Major Healing Potion", "common", 1000, 9000, 140),
     (8170, "Rugged Leather", "common", 375, 2400, 300),
     (15417, "Devilsaur Leather", "uncommon", 1500, 160000, 12),
@@ -63,6 +63,15 @@ ICONS = {
     10940: "inv_enchant_duststrange", 11083: "inv_enchant_dustsoul", 12359: "inv_ingot_07",
 }
 
+# recipe id, name, profession, crafted item, quantity made, [(reagent, quantity)]
+RECIPES = [
+    (1, "Major Mana Potion", "Alchemy", 13444, 1, [(13463, 3), (13467, 2), (8925, 1)]),
+    (2, "Major Healing Potion", "Alchemy", 13446, 1, [(13464, 2), (13465, 1), (8925, 1)]),
+    (3, "Bolt of Runecloth", "Tailoring", 14048, 1, [(14047, 4)]),
+    (4, "Smelt Thorium", "Mining", 12359, 1, [(10620, 1)]),
+    (5, "Smelt Iron", "Mining", 3575, 1, [(2772, 1)]),
+]
+
 HOUSE_FACTOR = {2: 1.00, 6: 1.08, 7: 1.25}
 HOUSE_SUPPLY = {2: 1.0, 6: 1.1, 7: 0.25}
 
@@ -88,6 +97,12 @@ def build(db, ruleset, hours=96, seed=42):
     db.executemany("""INSERT OR REPLACE INTO items (item_id, name, quality, sell_price, found, fetched_ts, icon, icon_ts)
                       VALUES (?,?,?,?,?,?,?,?)""",
                    [(i, n, q, v, 1, now, ICONS.get(i, ""), now) for i, n, q, v, _, _ in ITEMS])
+    # a vendor reagent and a few recipes, so the crafting page has something to show
+    db.execute("""INSERT OR REPLACE INTO items (item_id, name, quality, sell_price, found, fetched_ts, icon, icon_ts, vendor_buy)
+                  VALUES (8925, 'Crystal Vial', 'common', 100, 1, ?, '', ?, 2000)""", (now, now))
+    for rid, name, prof, made, qty, reagents in RECIPES:
+        db.execute("INSERT OR REPLACE INTO recipes VALUES (?,?,?,?,?,?)", (rid, name, prof, "Demo", made, qty))
+        db.executemany("INSERT INTO recipe_reagents VALUES (?,?,?)", [(rid, i, n) for i, n in reagents])
 
     drift = {i: 1.0 for i, *_ in ITEMS}
     turnover = {i: rng.uniform(0.005, 0.06) for i, *_ in ITEMS}  # share of listed units sold per hour

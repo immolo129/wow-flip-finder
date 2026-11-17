@@ -227,17 +227,24 @@ def fetch_missing_items(db, api, max_items=3000):
 
     with ThreadPoolExecutor(max_workers=8) as ex:
         rows = list(ex.map(one, ids))
-    db.executemany("""INSERT OR REPLACE INTO items (item_id, name, quality, sell_price, found, fetched_ts)
-                      VALUES (?,?,?,?,?,?)""", rows)
+    # upsert, so the icon and vendor price columns survive a re-fetch
+    db.executemany("""INSERT INTO items (item_id, name, quality, sell_price, found, fetched_ts) VALUES (?,?,?,?,?,?)
+                      ON CONFLICT(item_id) DO UPDATE SET
+                        name=CASE WHEN excluded.found=1 OR items.name IS NULL THEN excluded.name ELSE items.name END,
+                        quality=excluded.quality,
+                        sell_price=excluded.sell_price, found=excluded.found, fetched_ts=excluded.fetched_ts""", rows)
     return len(rows)
 
 
 def fetch_missing_icons(db, api, max_items=3000):
-    """Look up icons for listed items that don't have one yet; retry missing ones weekly."""
+    """Look up icons for listed items and recipe items that don't have one yet; retry missing ones weekly."""
     now = int(time.time())
     ids = [r["item_id"] for r in db.query(
-        """SELECT DISTINCT i.item_id FROM items i JOIN latest_listings l ON l.item_id = i.item_id
-           WHERE i.icon IS NULL OR (i.icon = '' AND i.icon_ts < ?) LIMIT ?""",
+        """SELECT item_id FROM items
+           WHERE (icon IS NULL OR (icon = '' AND icon_ts < ?))
+             AND item_id IN (SELECT item_id FROM latest_listings UNION SELECT crafted_item FROM recipes
+                             UNION SELECT item_id FROM recipe_reagents)
+           LIMIT ?""",
         (now - 7 * 86400, max_items))]
     if not ids:
         return 0
@@ -254,6 +261,95 @@ def fetch_missing_icons(db, api, max_items=3000):
         rows = list(ex.map(one, ids))
     db.executemany("UPDATE items SET icon=?, icon_ts=? WHERE item_id=?", rows)
     return sum(1 for icon, _, _ in rows if icon)
+
+
+# ---------- crafting ----------
+RECIPE_REFRESH_DAYS = 7
+
+# Reagents that vendors sell. Blizzard's item data has a buy price for every item but doesn't say
+# whether any vendor actually sells it, so only these are priced at the vendor.
+VENDOR_REAGENTS = {
+    3371, 3372, 8925, 18256,                     # vials: empty, leaded, crystal, imbued
+    2320, 2321, 4291, 8343, 14341,               # thread: coarse, fine, silken, heavy silken, rune
+    2324, 2325, 2604, 2605, 4340, 4341, 4342, 6260, 6261, 10290,   # bleach and dyes
+    2880, 3466, 3857,                            # weak flux, strong flux, coal
+    2678, 2692, 3713, 159, 1179,                 # spices, spring water, milk
+    4399, 4400, 4470,                            # wooden stock, heavy stock, simple wood
+    6217,                                        # copper rod
+}
+
+
+def fetch_recipes(db, api, force=False):
+    """Fetch every Forever recipe (what it makes, from what). Weekly; recipes rarely change."""
+    now = int(time.time())
+    last = db.one("SELECT value FROM meta WHERE key='recipes_ts'")
+    if not force and last and now - int(last["value"]) < RECIPE_REFRESH_DAYS * 86400:
+        return 0
+    ns = "static-forever"
+    todo = []  # (recipe id, profession, category)
+    for p in (api.get("/data/wow/profession/index", ns) or {}).get("professions") or []:
+        prof = api.get(f"/data/wow/profession/{p['id']}", ns) or {}
+        for t in prof.get("skill_tiers") or []:
+            tier = api.get(f"/data/wow/profession/{p['id']}/skill-tier/{t['id']}", ns) or {}
+            for c in tier.get("categories") or []:
+                for r in c.get("recipes") or []:
+                    todo.append((r["id"], prof.get("name") or p.get("name"), c.get("name")))
+    if not todo:
+        log.warning("No recipes returned; keeping the old ones")
+        return 0
+
+    def one(job):
+        rid, prof, cat = job
+        try:
+            d = api.get(f"/data/wow/recipe/{rid}", ns)
+        except Exception as e:
+            log.warning("recipe %s: %s", rid, e)
+            return None
+        made = d and (d.get("crafted_item") or d.get("horde_crafted_item") or d.get("alliance_crafted_item"))
+        if not made:
+            return None  # enchants on gear etc. make nothing that can be sold
+        q = d.get("crafted_quantity") or {}
+        qty = q.get("value") or (q.get("minimum", 1) + q.get("maximum", 1)) / 2 or 1
+        reagents = [(r["reagent"]["id"], r["reagent"].get("name"), r.get("quantity") or 1)
+                    for r in d.get("reagents") or [] if (r.get("reagent") or {}).get("id")]
+        return rid, d.get("name"), prof, cat, made["id"], made.get("name"), qty, reagents
+
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        got = [g for g in ex.map(one, todo) if g]
+    with db.transaction():
+        db.execute("DELETE FROM recipes")
+        db.execute("DELETE FROM recipe_reagents")
+        db.executemany("INSERT OR REPLACE INTO recipes VALUES (?,?,?,?,?,?)",
+                       [(rid, name, prof, cat, made, qty) for rid, name, prof, cat, made, _, qty, _ in got])
+        db.executemany("INSERT INTO recipe_reagents VALUES (?,?,?)",
+                       [(g[0], iid, n) for g in got for iid, _, n in g[7]])
+        # names for items we haven't seen on the auction house yet (found=0: details fetched later if listed)
+        names = {g[4]: g[5] for g in got}
+        names.update({iid: nm for g in got for iid, nm, _ in g[7]})
+        db.executemany("INSERT OR IGNORE INTO items (item_id, name, found, fetched_ts) VALUES (?,?,0,0)",
+                       [(i, n or f"Item {i}") for i, n in names.items()])
+        db.execute("INSERT OR REPLACE INTO meta VALUES ('recipes_ts', ?)", (str(now),))
+    return len(got)
+
+
+def fetch_vendor_prices(db, api):
+    """Vendor buy prices for the known vendor reagents that recipes use."""
+    ids = [r["item_id"] for r in db.query(
+        "SELECT DISTINCT item_id FROM recipe_reagents WHERE item_id IN (%s)" % ",".join(map(str, VENDOR_REAGENTS)))]
+    have = {r["item_id"] for r in db.query("SELECT item_id FROM items WHERE vendor_buy IS NOT NULL")}
+    rows = []
+    for iid in ids:
+        if iid in have:
+            continue
+        try:
+            d = api.item(iid) or {}
+        except Exception as e:
+            log.warning("vendor price %s: %s", iid, e)
+            continue
+        if d.get("purchase_price"):
+            rows.append((int(d["purchase_price"] / max(1, d.get("purchase_quantity") or 1)), iid))
+    db.executemany("UPDATE items SET vendor_buy=? WHERE item_id=?", rows)
+    return len(rows)
 
 
 # ---------- one full run ----------
@@ -325,10 +421,18 @@ def collect(db, api, ruleset, keep_days=21):
         raise RuntimeError("; ".join(errors))
 
     recompute_market(db, ruleset)
+    try:  # crafting data is extra: a failure here mustn't lose the auction snapshot
+        n_recipes = fetch_recipes(db, api)
+    except Exception as e:
+        log.exception("Fetching recipes failed")
+        n_recipes, errors = 0, errors + [f"recipes: {e}"]
     n_items = fetch_missing_items(db, api)
+    fetch_vendor_prices(db, api)
     n_icons = fetch_missing_icons(db, api)
     prune(db, keep_days)
     msg = f"{len(houses)} houses, {total} listings, {n_items} new item names, {n_icons} new icons, {time.time() - t0:.0f}s"
+    if n_recipes:
+        msg += f", {n_recipes} recipes refreshed"
     if unchanged:
         msg += f"; unchanged: {', '.join(unchanged)}"
     if errors:

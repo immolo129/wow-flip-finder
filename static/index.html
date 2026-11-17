@@ -175,6 +175,17 @@
   #tip { display: none; position: absolute; pointer-events: none; background: #0b0b0e; border: 1px solid var(--line2); border-radius: 9px;
          padding: 8px 11px; font-size: 12px; white-space: nowrap; box-shadow: 0 8px 24px rgba(0, 0, 0, .5); }
   #tip .when { color: var(--muted); margin-bottom: 4px; }
+  /* crafting reagent breakdown (in the row's chart area and the item panel) */
+  .reagents { margin: 4px 0 14px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--panel); }
+  .reagents .rhd { padding: 10px 14px; border-bottom: 1px solid var(--line); color: var(--muted); }
+  .reagents .rhd b { color: var(--text); }
+  .reagents table { width: 100%; }
+  .reagents th, .reagents td { padding: 7px 14px; font-size: 13px; cursor: default; }
+  .reagents th { position: static; background: none; cursor: default; }
+  .reagents .ico { width: 24px; height: 24px; border-radius: 5px; font-size: 11px; }
+  .reagents tr.sum td { color: var(--muted); }
+  .reagents tbody tr:hover { background: none; }
+  .filters label select { width: 170px; }
   #tip i, .legend i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
   /* the item view as its own page (#item/<house>/<item>, opened in a new tab) */
   body.itemmode .app, body.itemmode #drawer .back { display: none; }
@@ -222,7 +233,7 @@
   .filters { display: none; flex-wrap: wrap; gap: 14px; align-items: end; padding: 16px 20px; border-bottom: 1px solid var(--line); }
   .filters.show { display: flex; }
   .filters label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--muted); }
-  .filters input[type=number] { width: 120px; background: var(--panel2); color: var(--text); border: 1px solid var(--line2);
+  .filters input[type=number], .filters select { width: 120px; background: var(--panel2); color: var(--text); border: 1px solid var(--line2);
                                 border-radius: 8px; padding: 7px 9px; font: inherit; }
   .filters .chk { flex-direction: row; align-items: center; gap: 7px; padding-bottom: 8px; }
   .tablebar { display: flex; align-items: center; gap: 10px; padding: 14px 20px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 13px; flex-wrap: wrap; }
@@ -289,6 +300,7 @@
   <symbol id="i-vendor" viewBox="0 0 24 24"><circle cx="9" cy="9" r="6"/><path d="M15.5 9.5a6 6 0 1 1-6 6"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
   <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+  <symbol id="i-craft" viewBox="0 0 24 24"><path d="M9 3h6"/><path d="M10 3v6.5L4.6 18.2A2 2 0 0 0 6.3 21h11.4a2 2 0 0 0 1.7-2.8L14 9.5V3"/><path d="M7 15h10"/></symbol>
   <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
   <symbol id="i-sync" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
 </svg>
@@ -304,6 +316,12 @@
           <a href="#reset" data-page="reset"><svg class="i"><use href="#i-reset"/></svg>Underpriced<span class="n" id="n-reset"></span></a>
           <a href="#arbitrage" data-page="arbitrage"><svg class="i"><use href="#i-arb"/></svg>Between houses<span class="n" id="n-arbitrage"></span></a>
           <a href="#vendor" data-page="vendor"><svg class="i"><use href="#i-vendor"/></svg>Below vendor<span class="n" id="n-vendor"></span></a>
+        </div>
+      </div>
+      <div class="group" data-group="craft">
+        <button class="navlabel" type="button">Crafting &amp; professions<svg class="i chev"><use href="#i-chev"/></svg></button>
+        <div class="items">
+          <a href="#craft" data-page="craft"><svg class="i"><use href="#i-craft"/></svg>Crafting profits<span class="n" id="n-craft"></span></a>
         </div>
       </div>
     </nav>
@@ -366,10 +384,11 @@
         <div class="summary" id="summary"></div>
         <div class="card">
           <div class="filters" id="filters">
-            <label data-for="reset arbitrage vendor">Min profit (gold)<input type="number" id="f-min_profit" step="0.1" min="0"></label>
-            <label data-for="reset arbitrage">Min ROI %<input type="number" id="f-min_roi" step="1" min="0"></label>
+            <label data-for="craft">Profession<select id="f-profession"><option value="">All professions</option></select></label>
+            <label data-for="reset arbitrage vendor craft">Min profit (gold)<input type="number" id="f-min_profit" step="0.1" min="0"></label>
+            <label data-for="reset arbitrage craft">Min ROI %<input type="number" id="f-min_roi" step="1" min="0"></label>
             <label data-for="reset">Buy below % of market<input type="number" id="f-buy_pct" step="1" min="10" max="100"></label>
-            <label data-for="reset arbitrage">Min snapshots seen<input type="number" id="f-min_seen" step="1" min="1"></label>
+            <label data-for="reset arbitrage craft">Min snapshots seen<input type="number" id="f-min_seen" step="1" min="1"></label>
             <label data-for="reset arbitrage">Min avg listings<input type="number" id="f-min_listings" step="1" min="0"></label>
             <label data-for="reset arbitrage" title="Don't buy more than sells in this many days (once sales have been tracked for 12 h)">Days to sell<input type="number" id="f-sell_days" step="0.5" min="0.5"></label>
             <label class="chk" data-for="arbitrage"><input type="checkbox" id="f-include_alt"> Include routes that need an alt on the other faction</label>
@@ -394,6 +413,7 @@
   <div class="dpanel">
     <div class="dhead" id="dhead"></div>
     <div class="dflip" id="dflip" hidden></div>
+    <div id="dreagents"></div>
     <div class="dstats" id="dstats"></div>
     <div class="dctl">
       <div class="seg" id="dhouses" title="Auction house"></div>
@@ -414,6 +434,7 @@ const DEFAULTS = {
   reset:     { min_profit: 0.5, min_roi: 15, buy_pct: 80, min_seen: 3, min_listings: 2, sell_days: 2 },
   arbitrage: { min_profit: 0.5, min_roi: 20, min_seen: 3, min_listings: 2, sell_days: 2 },
   vendor:    { min_profit: 0.01 },
+  craft:     { profession: "", min_profit: 0.5, min_roi: 10, min_seen: 3 },
 };
 const PAGES = {
   reset: { title: "Underpriced", tag: "Underpriced", icon: "i-reset",
@@ -422,6 +443,8 @@ const PAGES = {
     help: "Buy in one auction house and sell in another. A Horde character can use both the Horde and the neutral Blackwater house, so those routes need no alt." },
   vendor: { title: "Below vendor price", tag: "Below vendor", icon: "i-vendor",
     help: "Listings priced below what a vendor pays. Buy them and sell to any vendor straight away. No risk, as long as they're still there." },
+  craft: { title: "Crafting profits", tag: "Crafting", icon: "i-craft",
+    help: "Recipes whose result sells for more than the reagents cost. Each reagent is priced at its cheapest source (Horde, Blackwater or a vendor), the result at its market value after the AH cut. You need the profession and the recipe." },
 };
 const COLS = {
   reset: [
@@ -438,8 +461,12 @@ const COLS = {
     ["name", "Item", "item"], ["house", "House", "l"], ["buy_units", "Units"], ["buy_upto", "Buy up to", "m"],
     ["cost", "Cost", "m"], ["sell_at", "Vendor pays", "m"], ["profit", "Profit", "m p"], ["roi", "ROI", "r"],
   ],
+  craft: [
+    ["name", "Crafted item", "item"], ["profession", "Profession", "l"], ["house", "Sell in", "l"], ["cost", "Reagent cost", "m"],
+    ["sell_at", "Sells for", "m"], ["profit", "Profit", "m p"], ["roi", "ROI", "r"], ["sells_day", "Sells/day", "v"], ["confidence", "Data", "conf"],
+  ],
 };
-const KINDS = ["reset", "arbitrage", "vendor"];
+const KINDS = ["reset", "arbitrage", "vendor", "craft"];
 const MAX_ROWS = 500;
 const SHARDS = 64;
 
@@ -474,7 +501,7 @@ function savedFilters(k) {
 function filtersFor(k) { return { ...DEFAULTS[k], ...savedFilters(k) }; }
 function loadFilters() {
   const f = filtersFor(kind);
-  for (const k of ["min_profit", "min_roi", "buy_pct", "min_seen", "min_listings", "sell_days"]) if (f[k] !== undefined) $("f-" + k).value = f[k];
+  for (const k of ["profession", "min_profit", "min_roi", "buy_pct", "min_seen", "min_listings", "sell_days"]) if (f[k] !== undefined) $("f-" + k).value = f[k];
   $("f-include_alt").checked = !!f.include_alt;
   document.querySelectorAll("#filters [data-for]").forEach((el) => {
     el.style.display = el.dataset.for.split(" ").includes(kind) ? "" : "none";
@@ -494,13 +521,19 @@ function toCalc(k, f) {
     min_profit: Math.round(num("min_profit") * 10000),
     min_roi: (num("min_roi") || 0) / 100, buy_pct: (num("buy_pct") || 80) / 100,
     min_seen: num("min_seen") || 1, min_listings: num("min_listings") || 0, sell_days: num("sell_days") || 0,
-    include_alt: !!f.include_alt,
+    include_alt: !!f.include_alt, profession: f.profession || "",
   };
+}
+function fillProfessions() {
+  const sel = $("f-profession"), cur = filtersFor("craft").profession || "";
+  const profs = [...new Set(D.recipes.map((r) => r[2]))].sort();
+  sel.innerHTML = `<option value="">All professions</option>` +
+    profs.map((p) => `<option value="${esc(p)}"${p === cur ? " selected" : ""}>${esc(p)}</option>`).join("");
 }
 const showAll = () => prefs().houses === "all";
 const faction = () => (showAll() ? null : D.status.faction);
 const compute = (k, f) => FLIPS[k](D, toCalc(k, f), faction()).map((r) => ({ ...r, kind: k,
-  below: r.market ? 1 - r.buy_upto / r.market : null }));
+  below: r.market && r.buy_upto ? 1 - r.buy_upto / r.market : null }));
 
 // ---------- password lock ----------
 // On GitHub the data files are encrypted (see export.py). The key is derived from the
@@ -573,6 +606,7 @@ async function loadData() {
     return;
   }
   D.encrypted = !!raw.enc;
+  fillProfessions();
   document.body.classList.remove("locked");
   $("lockerr").textContent = "";
   shardCache.clear();
@@ -674,10 +708,27 @@ async function toggleDetail(tr) {
   d.className = "detail";
   d.innerHTML = `<td colspan="${COLS[kind].length}"><div class="dhint"><span>${esc(r.name)} in ${esc(short(house))} · last 7 days</span>` +
     `<span class="grow"></span><button class="btn" data-details-row="${tr.dataset.i}">⤢ Details</button>` +
-    `<a class="btn" href="${itemHref(r)}" target="_blank" rel="noopener">↗ New tab</a></div><canvas></canvas>` +
+    `<a class="btn" href="${itemHref(r)}" target="_blank" rel="noopener">↗ New tab</a></div>` +
+    (r.kind === "craft" ? reagentTable(r) : "") + `<canvas></canvas>` +
     `<div class="legend"><span><i style="background:var(--blue)"></i>Lowest listing</span><span><i style="background:var(--accent)"></i>Market value</span></div></td>`;
   tr.after(d);
   drawPrice(d.querySelector("canvas"), await loadHistory(r.house_id, r.item_id), null, 7);
+}
+
+// Reagent breakdown for a crafting row: what to buy, how many, where, and what it costs.
+function reagentTable(r) {
+  const rows = r.parts.map((p) => {
+    const q = esc(p.quality || "common");
+    return `<tr><td class="l"><div class="item">${itemIcon(p, q)}<span class="nm q-${q}">${esc(p.name)}</span></div></td>` +
+      `<td>${p.qty} ×</td><td>${money(p.price)}</td><td class="l" style="color:var(--muted)">${esc(short(p.source))}</td>` +
+      `<td>${money(p.price * p.qty)}</td></tr>`;
+  }).join("");
+  const made = r.crafted_qty !== 1 ? ` (makes ${r.crafted_qty})` : "";
+  return `<div class="reagents"><div class="rhd"><b>${esc(r.recipe)}</b> · ${esc(r.profession)}${made}</div>` +
+    `<table><thead><tr><th class="l">Reagent</th><th>Need</th><th>Price each</th><th class="l">Cheapest at</th><th>Cost</th></tr></thead>` +
+    `<tbody>${rows}<tr class="sum"><td class="l" colspan="4">Total reagent cost</td><td>${money(r.cost)}</td></tr>` +
+    `<tr class="sum"><td class="l" colspan="4">Sells for, after the ${esc(short(r.house))} AH cut</td><td>${money(r.cost + r.profit)}</td></tr>` +
+    `<tr class="sum"><td class="l" colspan="4"><b>Profit</b></td><td class="profit">${money(r.profit)}</td></tr></tbody></table></div>`;
 }
 
 // #item/<house>/<item>: the item view as its own page (opened in a new tab)
@@ -707,7 +758,7 @@ function renderOverview() {
   $("stats").innerHTML = [
     ["Auction house", hname, `${s.region} · ${s.snapshots && s.snapshots.last ? "updated " + ago(s.snapshots.last) : "no data yet"}`],
     ["Items listed", units.toLocaleString("en"), `${auctions.toLocaleString("en")} auctions right now`],
-    ["Flips found", flips.length.toLocaleString("en"), `${all.reset.length} underpriced · ${all.arbitrage.length} between · ${all.vendor.length} vendor`],
+    ["Flips found", flips.length.toLocaleString("en"), `${all.reset.length} underpriced · ${all.arbitrage.length} between · ${all.vendor.length} vendor · ${all.craft.length} crafting`],
     ["Potential profit", money(total), best ? `best: ${esc(best.name)}` : "no flips yet"],
   ].map(([k, v, d]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`).join("");
 
@@ -755,10 +806,10 @@ function renderPage() {
   });
   const total = list.length;
   const tp = list.reduce((a, r) => a + r.profit, 0), tc = list.reduce((a, r) => a + r.cost, 0);
-  $("summary").innerHTML = [["Flips", total.toLocaleString("en")], ["Total cost", money(tc)], ["Potential profit", money(tp)]]
+  $("summary").innerHTML = [[kind === "craft" ? "Profitable recipes" : "Flips", total.toLocaleString("en")], ["Total cost", money(tc)], ["Potential profit", money(tp)]]
     .map(([k, v]) => `<div class="card"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
   list = list.slice(0, MAX_ROWS);
-  $("totals").innerHTML = total > MAX_ROWS ? `Showing the top ${MAX_ROWS} of ${total}` : `${total} flip${total === 1 ? "" : "s"}${q ? ` matching “${esc(q)}”` : ""}`;
+  $("totals").innerHTML = total > MAX_ROWS ? `Showing the top ${MAX_ROWS} of ${total}` : `${total} ${kind === "craft" ? "recipe" : "flip"}${total === 1 ? "" : "s"}${q ? ` matching “${esc(q)}”` : ""}`;
 
   $("tbl").querySelector("thead").innerHTML = "<tr>" + cols.map(([k, label, t]) =>
     `<th data-k="${k}" class="${["l", "item", "route", "conf"].includes(t) ? "l" : ""} ${sortKey === k ? "sorted" + (sortAsc ? " asc" : "") : ""}">${label}</th>`).join("") + "</tr>";
@@ -847,11 +898,13 @@ async function renderItem() {
 
   const fl = r.kind ? `<span class="tag ${r.kind}">${esc(PAGES[r.kind].tag)}</span> ` +
     (r.kind === "arbitrage" ? `Buy <b>${r.buy_units}</b> in ${esc(short(r.buy_house))} up to ${money(r.buy_upto)}, sell in ${esc(short(r.sell_house))} at ${money(r.sell_at)}`
+      : r.kind === "craft" ? `Craft with <b>${esc(r.profession)}</b> (${esc(r.recipe)}): reagents ${money(r.cost)}, sell in ${esc(short(r.house))} at ${money(r.sell_at)}`
       : r.kind === "vendor" ? `Buy <b>${r.buy_units}</b> up to ${money(r.buy_upto)} and sell to a vendor for ${money(r.sell_at)}`
       : `Buy <b>${r.buy_units}</b> up to ${money(r.buy_upto)}, relist at ${money(r.sell_at)}`) +
     ` → profit <b class="profit">${money(r.profit)}</b> <span class="roi">(${Math.round(r.roi * 100)}%)</span>` : "";
   $("dflip").innerHTML = fl;
   $("dflip").hidden = !fl;
+  $("dreagents").innerHTML = r.kind === "craft" ? reagentTable(r) : "";
 
   $("dhouses").innerHTML = houses.map((h) => `<button data-h="${h.id}" class="${h.id === IV.house ? "on" : ""}">${esc(short(h.name))}</button>`).join("");
   $("drange").innerHTML = RANGES.map(([d, l]) => `<button data-r="${d}" class="${d === IV.range ? "on" : ""}">${l}</button>`).join("");
@@ -1014,7 +1067,7 @@ document.addEventListener("click", (e) => {
   if (e.target.closest("a")) return;
   const top = e.target.closest("#toptbl tr[data-top]");
   if (top) { openItem($("toptbl").querySelector("tbody")._list[+top.dataset.top]); return; }
-  const th = e.target.closest("#tbl th");
+  const th = e.target.closest("#tbl > thead th");
   if (th) { const k = th.dataset.k; if (sortKey === k) sortAsc = !sortAsc; else { sortKey = k; sortAsc = false; } renderPage(); return; }
   const det = e.target.closest("[data-details], [data-details-row]");
   if (det) {
