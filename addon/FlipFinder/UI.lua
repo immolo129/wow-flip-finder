@@ -285,16 +285,18 @@ local function buildSniperPage(parent, mode)
   local isC = mode == "commodity"
 
   local title = text(page, 18, COL.text); title:SetPoint("TOPLEFT", 20, -16)
-  title:SetText(isC and "Commodity Sniper" or "Item Sniper")
+  local isV = mode == "vendor"
+  title:SetText(isC and "Commodity Sniper" or isV and "Vendor Sniper" or "Item Sniper")
   local sub = text(page, 11, COL.muted); sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -5)
   sub:SetText(isC and "Finds stackable goods priced far enough below the next price tier to resell at a profit."
+    or isV and "Finds listings below what a vendor pays. Buy them and sell to any vendor: guaranteed profit, no waiting."
     or "Finds single auctions (recipes, gear) listed far below their value. Buy one or a few, not twenty.")
 
   -- scanner card
   local card = box(page, COL.card, COL.line)
   card:SetPoint("TOPLEFT", 20, -62); card:SetPoint("RIGHT", -20, 0); card:SetHeight(84)
   local ct = text(card, 13, COL.text); ct:SetPoint("TOPLEFT", 14, -14)
-  ct:SetText(isC and "Commodity gap scanner" or "Below-value scanner")
+  ct:SetText(isC and "Commodity gap scanner" or isV and "Below-vendor scanner" or "Below-value scanner")
   local state = pill(card, "Idle", COL.muted); state:SetPoint("LEFT", ct, "RIGHT", 10, 0)
   local scopeCap = text(card, 11, COL.muted); scopeCap:SetPoint("TOPLEFT", 14, -52); scopeCap:SetText("Scan scope")
   local scope = dropdown(card, 420,
@@ -498,7 +500,7 @@ local function buildSniperPage(parent, mode)
       string.format("%d%%", d.roi * 100 + 0.5), fmtNum(s.soldPerDay),
       s.saleRate and string.format("%d%%", s.saleRate * 100 + 0.5) or "-",
       daysOf(d) and (daysOf(d) < 1 and "<1" or fmtNum(daysOf(d), daysOf(d) < 10)) or "-",
-      d.gap == math.huge and "open" or string.format("%d%%", d.gap * 100 + 0.5),
+      d.gap == nil and "-" or d.gap == math.huge and "open" or string.format("%d%%", d.gap * 100 + 0.5),
     }
     for c, fs in ipairs(r.cells) do
       local cx = colX[c]
@@ -509,7 +511,8 @@ local function buildSniperPage(parent, mode)
     end
     -- the Gap cell: a small bar under the number (full at 100 %+)
     local g = colX[#DEAL_COLS]
-    local frac = d.gap == math.huge and 1 or math.min(1, math.max(0, d.gap))
+    local frac = d.gap == nil and 0 or d.gap == math.huge and 1 or math.min(1, math.max(0, d.gap))
+    r.gapTrack:SetShown(d.gap ~= nil); r.gapBar:SetShown(d.gap ~= nil)
     r.gapTrack:ClearAllPoints(); r.gapTrack:SetPoint("TOPLEFT", g.x + 8, -ROW_H + 7); r.gapTrack:SetWidth(g.w - 14)
     r.gapBar:ClearAllPoints(); r.gapBar:SetPoint("TOPLEFT", r.gapTrack, "TOPLEFT"); r.gapBar:SetWidth(math.max(1, (g.w - 14) * frac))
     r.cells[#DEAL_COLS]:SetPoint("TOPLEFT", g.x, 3)
@@ -522,7 +525,8 @@ local function buildSniperPage(parent, mode)
       r.detail:ClearAllPoints(); r.detail:SetPoint("TOPLEFT", PAD + ICON, -ROW_H); r.detail:SetWidth(width - PAD * 2 - ICON)
       r.detail2:ClearAllPoints(); r.detail2:SetPoint("TOPLEFT", r.detail, "BOTTOMLEFT", 0, -4); r.detail2:SetWidth(width - PAD * 2 - ICON)
       r.detail:SetText("|cfff2b81dYou buy:|r  " .. listRow(d.rows))
-      r.detail2:SetText("|cff8e8e99Then:|r  " .. listRow(d.after) .. (d.mode == "commodity" and "   |cff8e8e99(resell just under the next price)|r" or ""))
+      r.detail2:SetText("|cff8e8e99Then:|r  " .. listRow(d.after) .. (d.mode == "commodity" and "   |cff8e8e99(resell just under the next price)|r"
+        or d.mode == "vendor" and ("   |cff8e8e99(a vendor pays " .. FF.Money(d.sell) .. " each)|r") or ""))
     end
     r:SetHeight(d.expanded and ROW_H + EXPAND_H - 8 or ROW_H)
   end
@@ -617,8 +621,18 @@ local function buildRulesPage(parent)
   local sub = text(page, 11, COL.muted); sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -5)
   sub:SetText("What counts as a deal. Values and sales data come from TradeSkillMaster (region = all Forever auction houses in your region).")
   local fields = {}
+  local scroll = CreateFrame("ScrollFrame", nil, page)
+  scroll:SetPoint("TOPLEFT", 0, -56); scroll:SetPoint("BOTTOMRIGHT", 0, 30)
+  local inner = CreateFrame("Frame", nil, scroll); inner:SetSize(1, 1)
+  scroll:SetScrollChild(inner)
+  scroll:SetScript("OnSizeChanged", function(s, w) inner:SetWidth(w) end)
+  scroll:EnableMouseWheel(true)
+  scroll:SetScript("OnMouseWheel", function(s, delta)
+    local max = math.max(0, inner:GetHeight() - s:GetHeight())
+    s:SetVerticalScroll(math.min(max, math.max(0, s:GetVerticalScroll() - delta * 60)))
+  end)
   local function section(y, name, cfgFn, defs, extra)
-    local c = box(page, COL.card, COL.line)
+    local c = box(inner, COL.card, COL.line)
     c:SetPoint("TOPLEFT", 20, y); c:SetPoint("RIGHT", -20, 0)
     local rowsN = math.ceil(#defs / 4) + (extra and 1 or 0)
     c:SetHeight(44 + rowsN * 54)
@@ -656,7 +670,7 @@ local function buildRulesPage(parent)
   src:SetPoint("TOPRIGHT", -20, -18)
   table.insert(toggles, src)
 
-  local first = section(-62, "Commodity Sniper", sniper, {
+  local first = section(-6, "Commodity Sniper", sniper, {
     { "Max % of value", "maxPct", nil, "Only listings below this % of the value." },
     { "Resell gap %", "gapPct", nil, "The price must jump at least this much after the cheap listings, so there's room to resell." },
     { "Price tolerance %", "tolerance", nil, "Listings within this % of the cheapest count as one cheap group." },
@@ -668,7 +682,7 @@ local function buildRulesPage(parent)
     { "Min profit (gold)", "minProfit", 10000 },
     { "Max spend per deal (gold)", "maxSpend", 10000 },
   }, salesAndQuality(sniper))
-  section(-62 - first:GetHeight() - 12, "Item Sniper", items, {
+  local second = section(-6 - first:GetHeight() - 12, "Item Sniper", items, {
     { "Max % of value", "maxPct", nil, "Only auctions below this % of the value." },
     { "Max quantity", "maxQty", nil, "Recipes and gear: buy one or a few." },
     { "Min ROI %", "minRoi" },
@@ -677,6 +691,14 @@ local function buildRulesPage(parent)
     { "Min sell chance %", "minChance" },
     { "Max spend per deal (gold)", "maxSpend", 10000 },
   }, salesAndQuality(items))
+  local vendorTop = -6 - first:GetHeight() - 12 - second:GetHeight() - 12
+  local third = section(vendorTop, "Vendor Sniper", function() return FF.db.vendor end, {
+    { "Min margin %", "marginPct", nil, "Only listings at least this % below what a vendor pays." },
+    { "Min profit (gold)", "minProfit", 10000 },
+    { "Max spend per deal (gold)", "maxSpend", 10000 },
+  })
+  inner:SetHeight(-vendorTop + third:GetHeight() + 20)
+  local hint = text(page, 10, COL.dim); hint:SetPoint("BOTTOMLEFT", 20, 12); hint:SetText("Scroll for more rules.")
   function page:Refresh()
     for _, f in ipairs(fields) do f.Refresh() end
     for _, t in ipairs(toggles) do t:Refresh() end
@@ -698,6 +720,7 @@ end
 local NAV = {
   { key = "commodity", name = "Commodity Sniper" },
   { key = "items", name = "Item Sniper" },
+  { key = "vendor", name = "Vendor Sniper" },
   { key = "rules", name = "Rules" },
   { sep = true },
   { key = "post", name = "Post" },
@@ -801,6 +824,7 @@ local function build()
   body:SetPoint("TOPLEFT", SIDE + 1, -HEAD); body:SetPoint("BOTTOMRIGHT", -1, 1)
   pages.commodity = buildSniperPage(body, "commodity")
   pages.items = buildSniperPage(body, "items")
+  pages.vendor = buildSniperPage(body, "vendor")
   pages.rules = buildRulesPage(body)
   for key, builder in pairs(UI.builders) do pages[key] = builder(body) end
   for _, n in ipairs(NAV) do

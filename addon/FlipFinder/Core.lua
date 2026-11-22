@@ -1,7 +1,7 @@
 -- Flip Finder: core. Settings, events, money formatting, logging and slash commands.
 local ADDON, FF = ...
 _G.FlipFinder = FF
-FF.version = "0.4.0"
+FF.version = "0.5.0"
 
 -- Settings. Money is in copper (1g = 10000), percentages are whole numbers.
 local DEFAULTS = {
@@ -39,6 +39,17 @@ local DEFAULTS = {
     minQuality = 1,
     minProfit = 2000,       -- 20s
     maxSpend = 5000000,
+    fastFirst = true,
+    autoRescan = false,
+  },
+  -- the vendor sniper: listings below what a vendor pays
+  vendor = {
+    group = "everything",
+    marginPct = 5,          -- at least this % below the vendor price
+    minProfit = 100,        -- 1s
+    maxSpend = 2000000,     -- 200g per deal
+    maxPct = 95,            -- unused by the vendor rules; kept so shared code has a value
+    minQuality = 0,
     fastFirst = true,
     autoRescan = false,
   },

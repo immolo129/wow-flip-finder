@@ -189,6 +189,10 @@ sales data (keep TSM and its desktop app running), so it needs no other setup.
   line for your running profit; 7 days / 30 days / all time, optionally only items you flipped. Purchases are
   recorded when you buy through Flip Finder; sales are read from Blizzard's "Auction successful" mails when
   you open your mailbox (read only: the addon never takes mail or money).
+- **Vendor Sniper:** listings priced below what a vendor pays (by at least *Min margin %*). Buy them and sell to any
+  vendor: guaranteed profit, no reselling. Uses the game's own vendor prices, so it works without TSM.
+- **Earnings, By item:** for every item you flipped: units bought and sold, average cost, spent, earned and profit on
+  the units that sold. Sales are matched to purchases by item name.
 - **Deals list:** click a column header to sort (again to reverse), type in *Filter items* to narrow it down, and
   click a row to see the exact listings you'd buy and what comes after them. Columns include sell chance, days to
   resell at the current pace, and the price gap (with a small bar). *Alerts* plays a sound and flashes new deals

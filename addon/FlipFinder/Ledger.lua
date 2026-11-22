@@ -80,6 +80,35 @@ function Ledger.Days(days, onlyFlipped)
   return out, tot
 end
 
+-- Profit per flipped item, all time: what you bought it for (average per unit) against what it sold for.
+-- Sales mails only carry the item name, so sales are matched to purchases by name.
+function Ledger.ByItem()
+  local l, by = db(), {}
+  for _, b in ipairs(l.buys) do
+    local e = by[b.name or "?"]
+    if not e then e = { name = b.name or "?", itemID = b.itemID, bought = 0, cost = 0, sold = 0, earned = 0, sales = 0 }; by[e.name] = e end
+    e.bought, e.cost = e.bought + (b.qty or 0), e.cost + (b.cost or 0)
+  end
+  for _, s in ipairs(l.sales) do
+    local e = by[s.name]
+    if e then e.sold, e.earned, e.sales = e.sold + (s.qty or 1), e.earned + (s.money or 0), e.sales + 1 end
+  end
+  local out = {}
+  for _, e in pairs(by) do
+    e.avg = e.bought > 0 and e.cost / e.bought or 0
+    e.costOfSold = e.avg * e.sold
+    e.profit = e.earned - e.costOfSold           -- realised: only the units that sold
+    e.roi = e.costOfSold > 0 and e.profit / e.costOfSold or nil
+    e.left = math.max(0, e.bought - e.sold)      -- still in bags, mail or on the AH
+    table.insert(out, e)
+  end
+  table.sort(out, function(a, b)
+    if (a.sold > 0) ~= (b.sold > 0) then return a.sold > 0 end   -- items with sales first
+    return a.profit > b.profit
+  end)
+  return out
+end
+
 function Ledger.Recent(n, onlyFlipped)
   local l, all = db(), {}
   for _, b in ipairs(l.buys) do table.insert(all, { t = b.t, kind = "buy", name = b.name, itemID = b.itemID, qty = b.qty, amount = -b.cost }) end
@@ -127,7 +156,7 @@ FF.UI.RegisterPage("earnings", function(parent)
 
   -- chart
   local chartCard = box(page, COL.card, COL.line)
-  chartCard:SetPoint("TOPLEFT", 20, -138); chartCard:SetPoint("RIGHT", -20, 0); chartCard:SetHeight(250)
+  chartCard:SetPoint("TOPLEFT", 20, -138); chartCard:SetPoint("RIGHT", -20, 0); chartCard:SetHeight(210)
   local legend = text(chartCard, 10, COL.muted); legend:SetPoint("TOPLEFT", 14, -10)
   legend:SetText("|cff4ade80■|r Earned   |cfff87171■|r Spent   |cfff2b81d—|r Running profit")
   local plot = CreateFrame("Frame", nil, chartCard)
@@ -225,14 +254,51 @@ FF.UI.RegisterPage("earnings", function(parent)
     for i = used.hits + 1, #pool.hits do pool.hits[i]:Hide() end
   end
 
-  -- recent purchases and sales
+  -- bottom card: recent purchases and sales, or profit per item
   local recent = box(page, COL.card, COL.line)
-  recent:SetPoint("TOPLEFT", 20, -400); recent:SetPoint("BOTTOMRIGHT", -20, 34)
-  local rt = text(recent, 13, COL.text); rt:SetPoint("TOPLEFT", 14, -10); rt:SetText("Recent")
-  local lines = {}
-  for i = 1, 5 do
-    local fs = text(recent, 11, COL.text); fs:SetPoint("TOPLEFT", 14, -12 - i * 20); fs:SetPoint("RIGHT", -14, 0); fs:SetJustifyH("LEFT")
+  recent:SetPoint("TOPLEFT", 20, -360); recent:SetPoint("BOTTOMRIGHT", -20, 34)
+  opts.tab = opts.tab or "byitem"
+  local tabs = {}
+  for i, tdef in ipairs({ { "byitem", "By item" }, { "recent", "Recent" } }) do
+    local b = button(recent, tdef[2], 80, 22, "ghost", function() opts.tab = tdef[1]; page:Refresh() end)
+    b:SetPoint("TOPLEFT", 12 + (i - 1) * 86, -8)
+    b.key = tdef[1]
+    tabs[i] = b
+  end
+  local note = text(recent, 10, COL.dim); note:SetPoint("TOPRIGHT", -14, -14)
+  -- columns for "By item"
+  local ICOLS = { { "Item", 0, "LEFT" }, { "Bought", 60 }, { "Sold", 50 }, { "Avg cost", 84 }, { "Spent", 84 }, { "Earned", 84 }, { "Profit", 84 }, { "ROI", 50 } }
+  local heads = {}
+  for i, c in ipairs(ICOLS) do
+    local h = text(recent, 10, COL.muted, nil, true); h:SetJustifyH(c[3] or "RIGHT"); h:SetText(c[1]:upper())
+    heads[i] = h
+  end
+  local lines, cells = {}, {}
+  local NLINES = 8
+  for i = 1, NLINES do
+    local fs = text(recent, 11, COL.text); fs:SetPoint("TOPLEFT", 14, -24 - i * 20); fs:SetPoint("RIGHT", -14, 0); fs:SetJustifyH("LEFT")
     lines[i] = fs
+    cells[i] = {}
+    for c = 1, #ICOLS do
+      local cf = text(recent, 11, c == 7 and COL.green or COL.text, nil, c == 7)
+      cf:SetJustifyH(ICOLS[c][3] or "RIGHT")
+      cells[i][c] = cf
+    end
+  end
+  local function layoutItemCols()
+    local width = recent:GetWidth() - 28
+    local fixed = 0
+    for i = 2, #ICOLS do fixed = fixed + ICOLS[i][2] end
+    local x = 14
+    for c, col in ipairs(ICOLS) do
+      local w = c == 1 and math.max(140, width - fixed) or col[2]
+      heads[c]:ClearAllPoints(); heads[c]:SetPoint("TOPLEFT", x, -40); heads[c]:SetWidth(w - 6)
+      for i = 1, NLINES do
+        local cf = cells[i][c]
+        cf:ClearAllPoints(); cf:SetPoint("TOPLEFT", x, -40 - i * 20); cf:SetWidth(w - 6)
+      end
+      x = x + w
+    end
   end
 
   function page:Refresh()
@@ -247,15 +313,47 @@ FF.UI.RegisterPage("earnings", function(parent)
     cards[3].v:SetTextColor(unpack(tot.profit < 0 and COL.red or COL.green))
     cards[4].v:SetText(tostring(tot.sales))
     drawChart(days)
-    local rec = Ledger.Recent(5, opts.onlyFlipped)
-    for i, fs in ipairs(lines) do
-      local e = rec[i]
-      if e then
-        fs:SetText(string.format("|cff8e8e99%s|r   %s %s%s   %s", date("%d %b %H:%M", e.t),
-          e.kind == "sale" and "|cff4ade80Sold|r" or "|cfff87171Bought|r", e.name or "?", e.qty and e.qty > 1 and (" x" .. e.qty) or "",
-          FF.Money(e.amount)))
-      else
-        fs:SetText(i == 1 and "|cff5f5f69Nothing recorded yet.|r" or "")
+    for _, b in ipairs(tabs) do b:SetStyle(b.key == opts.tab and "primary" or "ghost") end
+    local byItem = opts.tab == "byitem"
+    for _, h in ipairs(heads) do h:SetShown(byItem) end
+    -- only as many rows as fit in the card at this window size
+    local fit = math.max(1, math.min(NLINES, math.floor((recent:GetHeight() - (byItem and 48 or 30)) / 20)))
+    for i = 1, NLINES do
+      lines[i]:SetShown(not byItem and i <= fit)
+      for _, cf in ipairs(cells[i]) do cf:SetShown(byItem and i <= fit) end
+    end
+    if byItem then
+      layoutItemCols()
+      local items = Ledger.ByItem()
+      note:SetText(#items > 0 and string.format("All time · %d items · sales matched to purchases by name", #items) or "")
+      for i = 1, NLINES do
+        local e, c = items[i], cells[i]
+        if e then
+          c[1]:SetText(e.name)
+          c[2]:SetText(tostring(e.bought))
+          c[3]:SetText(e.sold > 0 and tostring(e.sold) or "|cff5f5f69-|r")
+          c[4]:SetText(FF.Money(e.avg))
+          c[5]:SetText(FF.Money(e.cost))
+          c[6]:SetText(e.earned > 0 and FF.Money(e.earned) or "|cff5f5f69-|r")
+          c[7]:SetText(e.sold > 0 and FF.Money(e.profit) or "|cff5f5f69not sold yet|r")
+          c[7]:SetTextColor(unpack(e.profit < 0 and COL.red or COL.green))
+          c[8]:SetText(e.roi and string.format("%d%%", e.roi * 100 + 0.5) or "-")
+        else
+          for k, cf in ipairs(c) do cf:SetText(i == 1 and k == 1 and #items == 0 and "|cff5f5f69No flips recorded yet.|r" or "") end
+        end
+      end
+    else
+      note:SetText("")
+      local rec = Ledger.Recent(NLINES, opts.onlyFlipped)
+      for i, fs in ipairs(lines) do
+        local e = rec[i]
+        if e then
+          fs:SetText(string.format("|cff8e8e99%s|r   %s %s%s   %s", date("%d %b %H:%M", e.t),
+            e.kind == "sale" and "|cff4ade80Sold|r" or "|cfff87171Bought|r", e.name or "?", e.qty and e.qty > 1 and (" x" .. e.qty) or "",
+            FF.Money(e.amount)))
+        else
+          fs:SetText(i == 1 and "|cff5f5f69Nothing recorded yet.|r" or "")
+        end
       end
     end
   end

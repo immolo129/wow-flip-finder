@@ -186,10 +186,45 @@ end
 
 -- ---------- running a scan ----------
 -- mode "commodity": stackables, gap rules (FF.db.sniper). mode "items": single auctions (FF.db.items).
-Sniper.deals = { commodity = {}, items = {} }
-Sniper.progress = { commodity = {}, items = {} }
+Sniper.deals = { commodity = {}, items = {}, vendor = {} }
+Sniper.progress = { commodity = {}, items = {}, vendor = {} }
 Sniper.mode = nil
-function Sniper.Config(mode) return mode == "items" and FF.db.items or FF.db.sniper end
+function Sniper.Config(mode)
+  if mode == "items" then return FF.db.items end
+  if mode == "vendor" then return FF.db.vendor end
+  return FF.db.sniper
+end
+
+-- what a vendor pays for one (from the game's item data; nil until the item is loaded)
+function Sniper.VendorPrice(itemID)
+  local sell = select(11, C_Item.GetItemInfo(itemID))
+  if sell == nil and C_Item.RequestLoadItemDataByID then C_Item.RequestLoadItemDataByID(itemID) end
+  return sell
+end
+
+-- The vendor sniper: listings below what a vendor pays (by at least the margin). Buy them all and sell
+-- to any vendor: no reselling, no AH cut, no waiting. Value = the vendor price.
+function Sniper.EvaluateVendor(itemID, ladder, vendor, cfg)
+  if not ladder or not ladder[1] then return nil, "no listings" end
+  if not vendor or vendor <= 0 then return nil, "no vendor price" end
+  local maxPrice = vendor * (1 - cfg.marginPct / 100)
+  local buy, cost, top, auctions, i = 0, 0, 0, {}, 1
+  while ladder[i] and ladder[i].price <= maxPrice do
+    local row = ladder[i]
+    if cost + row.price * row.qty > cfg.maxSpend then break end
+    buy, cost, top = buy + row.qty, cost + row.price * row.qty, row.price
+    if row.auctionID then table.insert(auctions, { auctionID = row.auctionID, buyout = row.buyout, qty = row.qty }) end
+    i = i + 1
+  end
+  if buy == 0 then return nil, "not below the vendor price" end
+  local profit = buy * vendor - cost
+  if profit < cfg.minProfit then return nil, "profit too small" end
+  local rows, after = ladderParts(ladder, i - 1)
+  return {
+    itemID = itemID, buy = buy, cost = cost, top = top, sell = vendor, profit = profit, roi = cost > 0 and profit / cost or 0,
+    gap = nil, value = vendor, auctions = auctions, cut = 0, rows = rows, after = after,
+  }
+end
 
 -- session numbers for the stat cards
 FF.session = { since = time(), opps = 0, seen = {}, bought = 0, invested = 0, projected = 0 }
@@ -258,7 +293,14 @@ function Sniper.Candidates(mode, results, myRun)
   local cands = {}
   for _, r in ipairs(results) do
     local key = r.itemKey
-    if key and key.battlePetSpeciesID == 0 and r.minPrice and r.minPrice > 0 then
+    if mode == "vendor" and key and key.battlePetSpeciesID == 0 and r.minPrice and r.minPrice > 0 then
+      local vendor = Sniper.VendorPrice(key.itemID)
+      if vendor and vendor > 0 and r.minPrice <= vendor * (1 - cfg.marginPct / 100) then
+        local info = itemInfo(key)
+        table.insert(cands, { key = key, value = vendor, info = info, commodity = isCommodity(key, info),
+                              sold = vendor - r.minPrice })   -- biggest margin first
+      end
+    elseif key and key.battlePetSpeciesID == 0 and r.minPrice and r.minPrice > 0 then
       local value = FF.Value(key.itemID)
       if value and r.minPrice <= value * cfg.maxPct / 100 and FF.PassesSales(key.itemID, cfg) then
         local info = itemInfo(key)
@@ -273,7 +315,8 @@ function Sniper.Candidates(mode, results, myRun)
   if cfg.fastFirst ~= false then table.sort(cands, function(a, b) return a.sold > b.sold end) end
   FF.Log(string.format("browse: %d items, %d candidates", #results, #cands))
   local p = { state = "Checking", group = group.name, items = #results, total = #cands, done = 0, listed = 0, deals = 0,
-              pct = cfg.maxPct, source = FF.SourceNames[FF.db.sniper.priceSource] }
+              pct = mode == "vendor" and (100 - cfg.marginPct) or cfg.maxPct,
+              source = mode == "vendor" and "vendor price" or FF.SourceNames[FF.db.sniper.priceSource] }
   progress(mode, p)
   if #cands == 0 then return Sniper.Done(mode, myRun) end
 
@@ -284,7 +327,7 @@ function Sniper.Candidates(mode, results, myRun)
       p.done = p.done + 1
       p.current = c
       if ladder and ladder[1] then p.listed = p.listed + 1 end
-      local evaluate = mode == "commodity" and Sniper.Evaluate or Sniper.EvaluateItems
+      local evaluate = mode == "commodity" and Sniper.Evaluate or mode == "vendor" and Sniper.EvaluateVendor or Sniper.EvaluateItems
       local deal, why = evaluate(c.key.itemID, ladder, c.value, cfg, cut)
       if deal then
         deal.itemKey, deal.name, deal.quality, deal.link = c.key, c.info.name, c.info.quality, c.info.link
