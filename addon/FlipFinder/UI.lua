@@ -326,6 +326,31 @@ local DEAL_COLS = {
 local BTN_W, PAD, ICON = 100, 14, 30
 
 local function fmtNum(v, dec) if not v then return "-" end return string.format(dec and "%.1f" or "%.0f", v) end
+-- the next sellers after your buy, each with how much dearer it is than the top price you pay
+local function nextRow(rows, top)
+  local parts = {}
+  for _, r in ipairs(rows or {}) do
+    local jump = top and top > 0 and string.format("  |cff58c27d+%d%%|r", (r.price / top - 1) * 100) or ""
+    table.insert(parts, r.qty .. " x " .. FF.Money(r.price) .. jump)
+  end
+  return #parts > 0 and table.concat(parts, "   ") or "|cff8e8e99nobody else: you'd be the only seller|r"
+end
+
+-- the deal's item name; if the game hadn't loaded it yet ("Item 4411"), ask for it again
+function UI.ItemName(d)
+  if d.name and not d.name:match("^Item %d+$") then return d.name end
+  local n = C_Item.GetItemNameByID(d.itemID)
+  if n then d.name = n; return n end
+  if C_Item.RequestLoadItemDataByID then C_Item.RequestLoadItemDataByID(d.itemID) end
+  return d.name
+end
+local nameRefresh = false
+FF:On("GET_ITEM_INFO_RECEIVED", function()
+  if nameRefresh then return end
+  nameRefresh = true
+  C_Timer.After(0.5, function() nameRefresh = false; if UI.Refresh then UI.Refresh() end end)
+end)
+
 local function listRow(rows) -- "12 x 2s 66c, 5 x 2s 67c"
   local parts = {}
   for _, r in ipairs(rows or {}) do table.insert(parts, r.qty .. " x " .. FF.Money(r.price)) end
@@ -500,7 +525,7 @@ local function buildSniperPage(parent, mode)
 
   -- rows (pooled); click a row to expand it
   local rows = {}
-  local EXPAND_H = 50
+  local EXPAND_H = 68
   local function row(i)
     if rows[i] then return rows[i] end
     local r = CreateFrame("Button", nil, content)
@@ -525,6 +550,7 @@ local function buildSniperPage(parent, mode)
     -- expanded details
     r.detail = text(r, 11, COL.muted, nil, false); r.detail:SetJustifyH("LEFT")
     r.detail2 = text(r, 11, COL.muted, nil, false); r.detail2:SetJustifyH("LEFT")
+    r.detail3 = text(r, 11, COL.muted, nil, false); r.detail3:SetJustifyH("LEFT")
     r.buy = flatButton(r, "Buy", 90, 22, "primary", function()
       local d = r.deal
       if not d or d.state == "bought" or d.state == "buying" or d.state == "failed" then return end
@@ -563,7 +589,7 @@ local function buildSniperPage(parent, mode)
     r.icon:SetTexture(C_Item.GetItemIconByID(d.itemID))
     local s = d.stats or {}
     local values = {
-      FF.QualityColor(d.quality) .. (d.name or "?") .. "|r",
+      FF.QualityColor(d.quality) .. (UI.ItemName(d) or "?") .. "|r",
       tostring(d.buy), FF.Money(d.top), FF.Money(d.cost), FF.Money(d.sell), FF.Money(d.profit),
       string.format("%d%%", d.roi * 100 + 0.5), fmtNum(s.soldPerDay),
       s.saleRate and string.format("%d%%", s.saleRate * 100 + 0.5) or "-",
@@ -588,13 +614,23 @@ local function buildSniperPage(parent, mode)
     r.buy:SetLabel(label); r.buy:SetStyle(style)
     r.buy:ClearAllPoints(); r.buy:SetPoint("TOPRIGHT", -12, -4)
     -- expanded: the listings you'd buy, and what comes after them
-    r.detail:SetShown(d.expanded); r.detail2:SetShown(d.expanded)
+    r.detail:SetShown(d.expanded); r.detail2:SetShown(d.expanded); r.detail3:SetShown(d.expanded)
     if d.expanded then
-      r.detail:ClearAllPoints(); r.detail:SetPoint("TOPLEFT", PAD + ICON, -ROW_H); r.detail:SetWidth(width - PAD * 2 - ICON)
-      r.detail2:ClearAllPoints(); r.detail2:SetPoint("TOPLEFT", r.detail, "BOTTOMLEFT", 0, -4); r.detail2:SetWidth(width - PAD * 2 - ICON)
+      local w = width - PAD * 2 - ICON
+      r.detail:ClearAllPoints(); r.detail:SetPoint("TOPLEFT", PAD + ICON, -ROW_H); r.detail:SetWidth(w)
+      r.detail2:ClearAllPoints(); r.detail2:SetPoint("TOPLEFT", r.detail, "BOTTOMLEFT", 0, -4); r.detail2:SetWidth(w)
+      r.detail3:ClearAllPoints(); r.detail3:SetPoint("TOPLEFT", r.detail2, "BOTTOMLEFT", 0, -4); r.detail3:SetWidth(w)
       r.detail:SetText("|cfff2b81dYou buy:|r  " .. listRow(d.rows))
-      r.detail2:SetText("|cff8e8e99Then:|r  " .. listRow(d.after) .. (d.mode == "commodity" and "   |cff8e8e99(resell just under the next price)|r"
-        or d.mode == "vendor" and ("   |cff8e8e99(a vendor pays " .. FF.Money(d.sell) .. " each)|r") or ""))
+      r.detail2:SetText("|cffe6e6e6Next sellers:|r  " .. nextRow(d.after, d.top))
+      local nxt = d.after and d.after[1]
+      if d.mode == "vendor" then
+        r.detail3:SetText("|cff8e8e99A vendor pays " .. FF.Money(d.sell) .. " each.|r")
+      elseif nxt then
+        r.detail3:SetText(string.format("|cff8e8e99Price jump:|r  %s  ->  %s  |cff58c27d(+%d%%)|r   |cff8e8e99You resell at %s each, just under the next seller.|r",
+          FF.Money(d.top), FF.Money(nxt.price), (nxt.price / d.top - 1) * 100, FF.Money(d.sell)))
+      else
+        r.detail3:SetText("|cff8e8e99No one else is selling it: you'd resell at its value, " .. FF.Money(d.sell) .. " each.|r")
+      end
     end
     r:SetHeight(d.expanded and ROW_H + EXPAND_H - 8 or ROW_H)
   end

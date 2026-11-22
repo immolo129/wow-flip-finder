@@ -85,7 +85,7 @@ end
 local function ladderParts(ladder, last)
   local bought, after = {}, {}
   for j = 1, last do table.insert(bought, { price = ladder[j].price, qty = ladder[j].qty }) end
-  for j = last + 1, math.min(#ladder, last + 3) do table.insert(after, { price = ladder[j].price, qty = ladder[j].qty }) end
+  for j = last + 1, math.min(#ladder, last + 5) do table.insert(after, { price = ladder[j].price, qty = ladder[j].qty }) end
   return bought, after
 end
 
