@@ -193,6 +193,16 @@ sales data (keep TSM and its desktop app running), so it needs no other setup.
   vendor: guaranteed profit, no reselling. Uses the game's own vendor prices, so it works without TSM.
 - **Earnings, By item:** for every item you flipped: units bought and sold, average cost, spent, earned and profit on
   the units that sold. Sales are matched to purchases by item name.
+- **Lists:** your own groups of items ("My herbs", "Recipes that sell"). Add items by clicking the box and
+  shift-clicking items, dragging them onto it, or typing an item ID. Every sniper's *Scan scope* offers your lists:
+  only those items are checked, so the scan is fast and has no noise.
+- **Crafting:** open each profession window once and Flip Finder reads your learned recipes (per character). The
+  Crafting page shows reagent cost (TSM market value or lowest buyout, or a vendor's price when cheaper), what the
+  result sells for after the AH cut, profit, ROI, daily sold and sell chance. *Reagents to list* puts a recipe's
+  reagents on the "Crafting reagents" list so you can snipe them cheaply.
+- **Collect auction mail:** a button next to the mailbox. One click takes the gold and items from auction mail
+  (sales, purchases, expired and cancelled auctions) one at a time, like Blizzard's own "Open All". It never
+  touches COD mail, stops when your bags are full, and records sales for Earnings before taking them.
 - **Deals list:** click a column header to sort (again to reverse), type in *Filter items* to narrow it down, and
   click a row to see the exact listings you'd buy and what comes after them. Columns include sell chance, days to
   resell at the current pace, and the price gap (with a small bar). *Alerts* plays a sound and flashes new deals

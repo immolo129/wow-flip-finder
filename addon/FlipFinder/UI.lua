@@ -146,6 +146,21 @@ local function dropdown(parent, w, getChoices, getText, getRight, onPick)
   return d
 end
 
+-- a text field with a grey placeholder
+local function input(parent, w, placeholder)
+  local eb = CreateFrame("EditBox", nil, parent, "BackdropTemplate")
+  eb:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 })
+  eb:SetBackdropColor(unpack(COL.field)); eb:SetBackdropBorderColor(unpack(COL.line2))
+  eb:SetSize(w or 200, 26)
+  setFont(eb, 12, ""); eb:SetTextColor(unpack(COL.text)); eb:SetTextInsets(8, 8, 0, 0); eb:SetAutoFocus(false)
+  eb.hint = text(eb, 11, COL.dim); eb.hint:SetPoint("LEFT", 8, 0); eb.hint:SetText(placeholder or "")
+  eb:HookScript("OnTextChanged", function(s) s.hint:SetShown(s:GetText() == "") end)
+  eb:SetScript("OnEscapePressed", function(s) s:ClearFocus() end)
+  eb:HookScript("OnEditFocusGained", function(s) s:SetBackdropBorderColor(unpack(COL.gold)) end)
+  eb:HookScript("OnEditFocusLost", function(s) s:SetBackdropBorderColor(unpack(COL.line2)) end)
+  return eb
+end
+
 -- number field for the rules page; `scale` converts stored copper to gold
 local function numberField(parent, caption, cfg, key, scale, tip)
   local f = CreateFrame("Frame", nil, parent)
@@ -302,7 +317,7 @@ local function buildSniperPage(parent, mode)
   local scope = dropdown(card, 420,
     function()
       local out = {}
-      for _, g in ipairs(FF.Sniper.Groups) do table.insert(out, { text = g.name, value = g.key }) end
+      out = FF.Sniper.Scopes()
       return out
     end,
     function() return FF.Sniper.Group(cfg().group).name end,
@@ -722,10 +737,12 @@ local NAV = {
   { key = "commodity", name = "Commodity Sniper", icon = "Interface\\Icons\\INV_Misc_Herb_07" },
   { key = "items", name = "Item Sniper", icon = "Interface\\Icons\\INV_Scroll_03" },
   { key = "vendor", name = "Vendor Sniper", icon = "Interface\\Icons\\INV_Misc_Coin_01" },
+  { key = "lists", name = "Lists", icon = "Interface\\Icons\\INV_Misc_Bag_08" },
   { key = "rules", name = "Rules", icon = "Interface\\Icons\\INV_Misc_Note_01" },
   { sep = true },
   { key = "post", name = "Post", icon = "Interface\\Icons\\INV_Letter_15" },
   { key = "cancel", name = "Cancel scan", icon = "Interface\\Icons\\Spell_ChargeNegative" },
+  { key = "crafting", name = "Crafting", icon = "Interface\\Icons\\Trade_BlackSmithing" },
   { sep = true },
   { key = "earnings", name = "Earnings", icon = "Interface\\Icons\\INV_Misc_Coin_02" },
 }
@@ -848,7 +865,7 @@ end
 -- building blocks for pages in other files
 FF.Kit = {
   COL = COL, box = box, text = text, setFont = setFont, flatButton = flatButton, pill = pill, checkbox = checkbox,
-  dropdown = dropdown, numberField = numberField, W = W, SIDE = SIDE, ROW_H = ROW_H,
+  dropdown = dropdown, numberField = numberField, input = input, W = W, SIDE = SIDE, ROW_H = ROW_H,
   status = function(msg) status(msg) end,
 }
 

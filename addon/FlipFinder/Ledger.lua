@@ -49,6 +49,7 @@ local function scanMail()
   end
 end
 FF:On("MAIL_INBOX_UPDATE", scanMail)
+Ledger.ScanMail = scanMail   -- the mailbox helper calls this before taking a mail
 
 -- ---------- numbers ----------
 local function isFlipped(name) return FF.db.flippedNames and FF.db.flippedNames[name] end

@@ -22,9 +22,25 @@ Sniper.Groups = {
   { key = "other",       name = "Gems, enchants & misc", filters = { { classID = CLASS.Gem }, { classID = CLASS.ItemEnhancement }, { classID = CLASS.Miscellaneous } } },
   { key = "everything",  name = "Everything",           filters = {} },
 }
+-- a scan scope: one of the categories above, or one of your lists ("list:<id>")
 function Sniper.Group(key)
+  local listID = type(key) == "string" and tonumber(key:match("^list:(%d+)$"))
+  if listID and FF.Lists then
+    local l = FF.Lists.Get(listID)
+    if l then return { key = key, name = "List: " .. l.name, list = listID, filters = {} } end
+  end
   for _, g in ipairs(Sniper.Groups) do if g.key == key then return g end end
   return Sniper.Groups[1]
+end
+
+-- every scope a scan can use: the categories, then your lists
+function Sniper.Scopes()
+  local out = {}
+  for _, g in ipairs(Sniper.Groups) do table.insert(out, { text = g.name, value = g.key }) end
+  for _, l in ipairs(FF.db.lists or {}) do
+    table.insert(out, { text = "List: " .. l.name .. " (" .. FF.Lists.Count(l) .. ")", value = "list:" .. l.id })
+  end
+  return out
 end
 
 Sniper.running = false
@@ -279,6 +295,15 @@ function Sniper.Start(mode, isRescan)
   progress(mode, { state = "Browsing", group = group.name, total = 0, done = 0, listed = 0, deals = 0 })
   FF.Log("sniper start: " .. mode .. " " .. group.key)
 
+  -- a list: no browsing, just check each item on it
+  if group.list then
+    local results = {}
+    for _, id in ipairs(FF.Lists.ItemIDs(group.list)) do
+      table.insert(results, { itemKey = C_AuctionHouse.MakeItemKey(id), fromList = true })
+    end
+    return Sniper.Candidates(mode, results, myRun)
+  end
+
   -- 1. browse every category of the group, then pick candidates
   local results, filters = {}, #group.filters > 0 and group.filters or { false }
   local pending = #filters
@@ -297,7 +322,15 @@ function Sniper.Candidates(mode, results, myRun)
   local cands = {}
   for _, r in ipairs(results) do
     local key = r.itemKey
-    if mode == "vendor" and key and key.battlePetSpeciesID == 0 and r.minPrice and r.minPrice > 0 then
+    if r.fromList and key then
+      local info = itemInfo(key)
+      local commodity = isCommodity(key, info)
+      local value = mode == "vendor" and Sniper.VendorPrice(key.itemID) or FF.Value(key.itemID)
+      if value and value > 0 and (mode == "vendor" or commodity == (mode == "commodity")) then
+        table.insert(cands, { key = key, value = value, info = info, commodity = commodity,
+                              sold = FF.Stats(key.itemID).soldPerDay or 0 })
+      end
+    elseif mode == "vendor" and key and key.battlePetSpeciesID == 0 and r.minPrice and r.minPrice > 0 then
       local vendor = Sniper.VendorPrice(key.itemID)
       if vendor and vendor > 0 and r.minPrice <= vendor * (1 - cfg.marginPct / 100) then
         local info = itemInfo(key)

@@ -68,6 +68,7 @@ There are no tests. To check a change, run demo mode, which needs no API keys an
 ## In-game addon (`addon/FlipFinder`)
 **Blizzard's rules come first, always.** The owner wants the addon and the website within Blizzard's Terms of Use, addon policy and API terms at all times. Before adding anything, check it against these:
 - Every purchase, post, cancel or other action that spends or moves gold or items must come from the player's own click (an `OnClick` handler), one action per click. Never chain them, never trigger them from timers, events or loops, never auto-confirm.
+- The one exception to one-action-per-click is the mailbox helper (`Mail.lua`): one click collects auction mail in sequence, exactly like Blizzard's own "Open All" button and the Postal addon. It only takes gold/items from the player's own auction mail, never COD mail, and never buys, posts or cancels.
 - Only Blizzard's addon API and TSM's public API. No memory reading, input automation, external programs driving the game, or anything that works around a protected function.
 - Be gentle on the servers: one auction-house query at a time, wait for `IsThrottledMessageSystemReady`, stop when the AH closes; "Keep scanning" pauses 5 s between rounds and stops by itself after 30 minutes.
 - Addon stays free, private and readable (no obfuscation, ads or payments). Website: respect Blizzard API rate limits and use the data privately.
