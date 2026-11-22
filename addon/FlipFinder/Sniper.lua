@@ -100,7 +100,12 @@ end
 
 local function isCommodity(itemKey, info)
   if info.isCommodity ~= nil then return info.isCommodity end
-  local status = C_AuctionHouse.GetItemCommodityStatus and C_AuctionHouse.GetItemCommodityStatus(itemKey.itemID)
+  local ok, status = pcall(function() return C_AuctionHouse.GetItemCommodityStatus(itemKey.itemID) end)
+  if not ok or not status then
+    -- fall back to the item's stack size: stackable trade goods are commodities
+    local _, _, _, _, _, _, _, stack = C_Item.GetItemInfo(itemKey.itemID)
+    return (stack or 1) > 1
+  end
   return status == (Enum.ItemCommodityStatus and Enum.ItemCommodityStatus.Commodity or 2)
 end
 
@@ -147,6 +152,7 @@ end
 function FF.RecordPurchase(deal)
   local s = FF.session
   s.bought, s.invested, s.projected = s.bought + 1, s.invested + deal.cost, s.projected + deal.profit
+  FF.db.flipped[deal.itemID] = time()   -- the Post page can offer "only items I flipped"
   FF:Fire("FF_SESSION_CHANGED")
 end
 

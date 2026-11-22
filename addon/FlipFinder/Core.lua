@@ -1,7 +1,7 @@
 -- Flip Finder: core. Settings, events, money formatting, logging and slash commands.
 local ADDON, FF = ...
 _G.FlipFinder = FF
-FF.version = "0.1.1"
+FF.version = "0.2.0"
 
 -- Settings. Money is in copper (1g = 10000), percentages are whole numbers.
 local DEFAULTS = {
@@ -40,6 +40,17 @@ local DEFAULTS = {
     fastFirst = true,
     autoRescan = false,
   },
+  -- posting and the cancel scan
+  post = {
+    floorPct = 80,          -- never post below this % of the value
+    normalPct = 100,        -- no competition: post at this % of the value
+    maxPct = 150,           -- never post above this % of the value
+    undercut = 1,           -- copper below the cheapest competitor
+    duration = 3,           -- 1 = 2 h, 2 = 8 h, 3 = 24 h on Forever
+    minValue = 1000,        -- don't bother with items worth less than this (10s)
+    onlyFlipped = false,    -- only post items bought with Flip Finder
+  },
+  flipped = {},             -- itemID -> when we bought it with Flip Finder
   page = "commodity",
   log = {},
 }

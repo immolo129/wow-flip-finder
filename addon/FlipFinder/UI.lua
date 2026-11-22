@@ -161,6 +161,10 @@ local function numberField(parent, caption, cfg, key, scale, tip)
   return f
 end
 
+-- Pages defined in other files (Post.lua, Cancel.lua) register a builder here before the window is built.
+UI.builders = {}
+function UI.RegisterPage(key, builder) UI.builders[key] = builder end
+
 -- ---------- state ----------
 local frame, pages, nav = nil, {}, {}
 local pending = nil  -- the commodity deal waiting for Confirm
@@ -533,8 +537,8 @@ local NAV = {
   { key = "items", name = "Item Sniper" },
   { key = "rules", name = "Rules" },
   { sep = true },
-  { key = "post", name = "Post", soon = true },
-  { key = "cancel", name = "Cancel scan", soon = true },
+  { key = "post", name = "Post" },
+  { key = "cancel", name = "Cancel scan" },
 }
 
 function UI.Go(key)
@@ -610,8 +614,10 @@ local function build()
   pages.commodity = buildSniperPage(body, "commodity")
   pages.items = buildSniperPage(body, "items")
   pages.rules = buildRulesPage(body)
-  pages.post = buildSoonPage(body, "Post", "Coming in version 0.2: post your bags at an undercut price, one click per auction.")
-  pages.cancel = buildSoonPage(body, "Cancel scan", "Coming in version 0.2: find your auctions that were undercut and cancel them, one click each.")
+  for key, builder in pairs(UI.builders) do pages[key] = builder(body) end
+  for _, n in ipairs(NAV) do
+    if n.key and not pages[n.key] then pages[n.key] = buildSoonPage(body, n.name, "Not available.") end
+  end
 
   frame.status = text(body, 11, COL.muted); frame.status:SetPoint("BOTTOMLEFT", 20, 12); frame.status:SetPoint("BOTTOMRIGHT", -20, 12)
   frame.status:SetJustifyH("LEFT")
@@ -619,6 +625,13 @@ local function build()
   frame:SetScript("OnShow", function() UI.Header(); UI.Go(FF.db.page or "commodity") end)
   frame:Hide()
 end
+
+-- building blocks for pages in other files
+FF.Kit = {
+  COL = COL, box = box, text = text, flatButton = flatButton, pill = pill, checkbox = checkbox,
+  dropdown = dropdown, numberField = numberField, W = W, SIDE = SIDE, ROW_H = ROW_H,
+  status = function(msg) status(msg) end,
+}
 
 function UI.Header()
   if not frame then return end

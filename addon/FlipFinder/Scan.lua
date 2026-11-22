@@ -43,6 +43,8 @@ function Scan.Next()
     AH.SendSearchQuery(AH.MakeItemKey(job.itemID), PRICE_SORT, true)
   elseif job.kind == "items" then
     AH.SendSearchQuery(job.itemKey, PRICE_SORT, true)
+  elseif job.kind == "owned" then
+    AH.QueryOwnedAuctions({ { sortOrder = Enum.AuctionHouseSortOrder.Name, reverseSort = false } })
   end
 end
 
@@ -74,6 +76,11 @@ end
 -- Items: the individual auctions of a non-stackable item. cb({ {price=, qty=, auctionID=, buyout=}, ... }) or nil
 function Scan.Items(itemKey, cb)
   add({ kind = "items", itemKey = itemKey, cb = cb })
+end
+
+-- Your own auctions. cb(list of OwnedAuctionInfo) or nil
+function Scan.Owned(cb)
+  add({ kind = "owned", cb = cb })
 end
 
 -- Same as Items, but ahead of everything else in the queue (used right before buying).
@@ -109,12 +116,17 @@ end)
 
 FF:On("COMMODITY_SEARCH_RESULTS_UPDATED", function(itemID)
   if not job or job.kind ~= "commodity" or itemID ~= job.itemID then return end
-  local ladder = {}
+  -- the ladder holds other players' listings (we can't buy our own); ladder.own maps our own
+  -- auction ids to their unit price (used by the cancel scan)
+  local ladder = { own = {} }
   for i = 1, AH.GetNumCommoditySearchResults(itemID) do
     local r = AH.GetCommoditySearchResultInfo(itemID, i)
-    -- skip our own auctions: we can't buy them
-    if r and r.unitPrice and (r.numOwnerItems or 0) < (r.quantity or 0) then
-      table.insert(ladder, { price = r.unitPrice, qty = r.quantity - (r.numOwnerItems or 0) })
+    if r and r.unitPrice then
+      local mine = r.numOwnerItems or 0
+      if mine > 0 and r.auctionID then ladder.own[r.auctionID] = r.unitPrice end
+      if mine < (r.quantity or 0) then
+        table.insert(ladder, { price = r.unitPrice, qty = r.quantity - mine })
+      end
     end
   end
   finish(ladder)
@@ -132,6 +144,16 @@ FF:On("ITEM_SEARCH_RESULTS_UPDATED", function(itemKey)
   end
   table.sort(ladder, function(a, b) return a.price < b.price end)
   finish(ladder)
+end)
+
+FF:On("OWNED_AUCTIONS_UPDATED", function()
+  if not job or job.kind ~= "owned" then return end
+  local list = {}
+  for i = 1, AH.GetNumOwnedAuctions() do
+    local a = AH.GetOwnedAuctionInfo(i)
+    if a then table.insert(list, a) end
+  end
+  finish(list)
 end)
 
 FF:On("AUCTION_HOUSE_THROTTLED_SYSTEM_READY", function() Scan.Next() end)

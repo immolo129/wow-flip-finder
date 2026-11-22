@@ -178,5 +178,12 @@ sales data (keep TSM and its desktop app running), so it needs no other setup.
   single auctions are one click to refresh, then one click per auction. Bought items go to your mailbox.
 - **Settings:** max % of value, daily sold / sell chance, max quantity, resell gap, price tolerance, min ROI,
   min quantity (bait filter), min quality, min profit, max spend, fast sellers first.
+- **Post:** *Scan bags* prices everything worth selling against the competition: undercut the cheapest by
+  your undercut amount, never below *Min % of value* or a vendor's price, never above *Max % of value*, and at
+  *Normal %* when nobody else sells it. Then **Post next** posts one item per click (Blizzard requires a click
+  per post). *Only items I flipped* limits it to things you bought with Flip Finder.
+- **Cancel scan:** *Scan my auctions* checks each of your auctions against the competition and lists the
+  undercut ones (or says to keep it up if the competitor is below your minimum). **Cancel next** cancels one
+  per click; the items go to your mailbox, ready to post again.
 - `/ff tooltip` turns the tooltip lines on/off, `/ff debug` + shift-click an item shows TSM's raw values,
   `/ff log` shows recent activity.
