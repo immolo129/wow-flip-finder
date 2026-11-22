@@ -64,8 +64,9 @@ function FF.Value(itemID)
 end
 
 -- Does the item pass the sales filter? (daily sold or sell chance, as chosen)
-function FF.PassesSales(itemID)
-  local cfg, s = FF.db.sniper, FF.Stats(itemID)
+function FF.PassesSales(itemID, cfg)
+  cfg = cfg or FF.db.sniper
+  local s = FF.Stats(itemID)
   if cfg.salesFilter == "chance" then
     return (s.saleRate or 0) * 100 >= cfg.minChance
   end

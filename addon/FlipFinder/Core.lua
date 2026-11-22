@@ -1,7 +1,7 @@
 -- Flip Finder: core. Settings, events, money formatting, logging and slash commands.
 local ADDON, FF = ...
 _G.FlipFinder = FF
-FF.version = "0.1.0"
+FF.version = "0.1.1"
 
 -- Settings. Money is in copper (1g = 10000), percentages are whole numbers.
 local DEFAULTS = {
@@ -25,6 +25,22 @@ local DEFAULTS = {
     fastFirst = true,       -- scan the fastest sellers first
     autoRescan = false,
   },
+  -- the item sniper (recipes, gear, other single auctions): below X % of the value, no gap rule
+  items = {
+    group = "recipes",
+    maxPct = 50,
+    salesFilter = "sold",
+    minSold = 0,
+    minChance = 0,
+    maxQty = 3,             -- recipes: buy one or a few, not 20
+    minRoi = 25,
+    minQuality = 1,
+    minProfit = 2000,       -- 20s
+    maxSpend = 5000000,
+    fastFirst = true,
+    autoRescan = false,
+  },
+  page = "commodity",
   log = {},
 }
 

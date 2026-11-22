@@ -27,7 +27,6 @@ function Sniper.Group(key)
   return Sniper.Groups[1]
 end
 
-Sniper.deals = {}
 Sniper.running = false
 local runID = 0
 local keepSince = nil   -- when "Keep scanning" started (see Sniper.Done)
@@ -105,110 +104,187 @@ local function isCommodity(itemKey, info)
   return status == (Enum.ItemCommodityStatus and Enum.ItemCommodityStatus.Commodity or 2)
 end
 
+-- The item sniper (recipes, gear, anything that isn't stackable): no gap rule, just listings below
+-- maxPct of the value, cheapest first, up to maxQty, resold just under the next listing or at the value.
+function Sniper.EvaluateItems(itemID, ladder, value, cfg, cut)
+  if not ladder or not ladder[1] then return nil, "no listings" end
+  if not value or value <= 0 then return nil, "no value" end
+  local maxPrice = value * cfg.maxPct / 100
+  local buy, cost, top, auctions, i = 0, 0, 0, {}, 1
+  while ladder[i] and ladder[i].price <= maxPrice and buy + ladder[i].qty <= cfg.maxQty do
+    local row = ladder[i]
+    if cost + row.price * row.qty > cfg.maxSpend then break end
+    buy, cost, top = buy + row.qty, cost + row.price * row.qty, row.price
+    if row.auctionID then table.insert(auctions, { auctionID = row.auctionID, buyout = row.buyout, qty = row.qty }) end
+    i = i + 1
+  end
+  if buy == 0 then return nil, "not cheap enough" end
+  local nextPrice = ladder[i] and ladder[i].price
+  local sell = nextPrice and math.min(nextPrice - 1, value) or value
+  local profit = buy * sell * (1 - cut) - cost
+  local roi = cost > 0 and profit / cost or 0
+  if profit < cfg.minProfit then return nil, "profit too small" end
+  if roi * 100 < cfg.minRoi then return nil, "ROI too small" end
+  return {
+    itemID = itemID, buy = buy, cost = cost, top = top, sell = sell, profit = profit, roi = roi,
+    gap = nextPrice and (nextPrice / top - 1) or math.huge, value = value, auctions = auctions, cut = cut,
+  }
+end
+
+-- ---------- running a scan ----------
+-- mode "commodity": stackables, gap rules (FF.db.sniper). mode "items": single auctions (FF.db.items).
+Sniper.deals = { commodity = {}, items = {} }
+Sniper.progress = { commodity = {}, items = {} }
+Sniper.mode = nil
+function Sniper.Config(mode) return mode == "items" and FF.db.items or FF.db.sniper end
+
+-- session numbers for the stat cards
+FF.session = { since = time(), opps = 0, seen = {}, bought = 0, invested = 0, projected = 0 }
+function FF.ResetSession()
+  FF.session = { since = time(), opps = 0, seen = {}, bought = 0, invested = 0, projected = 0 }
+  FF:Fire("FF_SESSION_CHANGED")
+end
+function FF.RecordPurchase(deal)
+  local s = FF.session
+  s.bought, s.invested, s.projected = s.bought + 1, s.invested + deal.cost, s.projected + deal.profit
+  FF:Fire("FF_SESSION_CHANGED")
+end
+
+local function progress(mode, p)
+  Sniper.progress[mode] = p
+  FF:Fire("FF_SNIPER_PROGRESS", mode, p)
+end
+
 function Sniper.Stop()
   Sniper.running = false
   runID = runID + 1
   FF.Scan.Clear()
-  FF:Fire("FF_SNIPER_STATUS", "Stopped")
+  if Sniper.mode then
+    local p = Sniper.progress[Sniper.mode]
+    p.state = "Stopped"
+    progress(Sniper.mode, p)
+  end
 end
 
-function Sniper.Start(isRescan)
+function Sniper.Start(mode, isRescan)
+  mode = mode or "commodity"
   if not isRescan then keepSince = nil end
   Sniper.Stop()
-  Sniper.running = true
+  Sniper.running, Sniper.mode = true, mode
   runID = runID + 1
   local myRun = runID
-  local cfg, group = FF.db.sniper, Sniper.Group(FF.db.sniper.group)
-  Sniper.deals = {}
-  FF:Fire("FF_DEALS_CHANGED")
-  FF:Fire("FF_SNIPER_STATUS", "Browsing " .. group.name .. "…")
-  FF.Log("sniper start: " .. group.key)
+  local cfg = Sniper.Config(mode)
+  local group = Sniper.Group(cfg.group)
+  Sniper.deals[mode] = {}
+  FF:Fire("FF_DEALS_CHANGED", mode)
+  progress(mode, { state = "Browsing", group = group.name, total = 0, done = 0, listed = 0, deals = 0 })
+  FF.Log("sniper start: " .. mode .. " " .. group.key)
 
   -- 1. browse every category of the group, then pick candidates
-  local results, pending = {}, #group.filters
-  if pending == 0 then pending = 1 end
-  local filters = #group.filters > 0 and group.filters or { false }
+  local results, filters = {}, #group.filters > 0 and group.filters or { false }
+  local pending = #filters
   for _, f in ipairs(filters) do
     FF.Scan.Browse(f and { f } or {}, function(res)
       if myRun ~= runID then return end
       for _, r in ipairs(res or {}) do table.insert(results, r) end
       pending = pending - 1
-      if pending == 0 then Sniper.Candidates(results, myRun) end
+      if pending == 0 then Sniper.Candidates(mode, results, myRun) end
     end)
   end
 end
 
-function Sniper.Candidates(results, myRun)
-  local cfg, cut = FF.db.sniper, Sniper.Cut()
+function Sniper.Candidates(mode, results, myRun)
+  local cfg, cut, group = Sniper.Config(mode), Sniper.Cut(), Sniper.Group(Sniper.Config(mode).group)
   local cands = {}
   for _, r in ipairs(results) do
     local key = r.itemKey
     if key and key.battlePetSpeciesID == 0 and r.minPrice and r.minPrice > 0 then
       local value = FF.Value(key.itemID)
-      if value and r.minPrice <= value * cfg.maxPct / 100 and FF.PassesSales(key.itemID) then
+      if value and r.minPrice <= value * cfg.maxPct / 100 and FF.PassesSales(key.itemID, cfg) then
         local info = itemInfo(key)
-        if (info.quality or 1) >= cfg.minQuality then
-          table.insert(cands, { key = key, value = value, info = info, sold = FF.Stats(key.itemID).soldPerDay or 0 })
+        local commodity = isCommodity(key, info)
+        if (info.quality or 1) >= cfg.minQuality and commodity == (mode == "commodity") then
+          table.insert(cands, { key = key, value = value, info = info, commodity = commodity,
+                                sold = FF.Stats(key.itemID).soldPerDay or 0 })
         end
       end
     end
   end
-  if cfg.fastFirst then table.sort(cands, function(a, b) return a.sold > b.sold end) end
+  if cfg.fastFirst ~= false then table.sort(cands, function(a, b) return a.sold > b.sold end) end
   FF.Log(string.format("browse: %d items, %d candidates", #results, #cands))
-  if #cands == 0 then return Sniper.Done(myRun, #results, 0) end
+  local p = { state = "Checking", group = group.name, items = #results, total = #cands, done = 0, listed = 0, deals = 0,
+              pct = cfg.maxPct, source = FF.SourceNames[FF.db.sniper.priceSource] }
+  progress(mode, p)
+  if #cands == 0 then return Sniper.Done(mode, myRun) end
 
   -- 2. load each candidate's price list and apply the deal rules
-  local left = #cands
-  FF:Fire("FF_SNIPER_STATUS", string.format("Checking %d candidates…", left))
   for _, c in ipairs(cands) do
     local function done(ladder)
       if myRun ~= runID then return end
-      left = left - 1
-      local deal, why = Sniper.Evaluate(c.key.itemID, ladder, c.value, cfg, cut)
+      p.done = p.done + 1
+      p.current = c
+      if ladder and ladder[1] then p.listed = p.listed + 1 end
+      local evaluate = mode == "commodity" and Sniper.Evaluate or Sniper.EvaluateItems
+      local deal, why = evaluate(c.key.itemID, ladder, c.value, cfg, cut)
       if deal then
         deal.itemKey, deal.name, deal.quality, deal.link = c.key, c.info.name, c.info.quality, c.info.link
-        deal.isCommodity = c.commodity
-        deal.stats = FF.Stats(c.key.itemID)
-        table.insert(Sniper.deals, deal)
-        table.sort(Sniper.deals, function(a, b) return a.profit > b.profit end)
-        FF:Fire("FF_DEALS_CHANGED")
+        deal.isCommodity, deal.stats, deal.mode = c.commodity, FF.Stats(c.key.itemID), mode
+        local list = Sniper.deals[mode]
+        table.insert(list, deal)
+        table.sort(list, function(a, b) return a.profit > b.profit end)
+        p.deals = p.deals + 1
+        local id = c.key.itemID .. ":" .. deal.top
+        if not FF.session.seen[id] then
+          FF.session.seen[id] = true
+          FF.session.opps = FF.session.opps + 1
+          FF:Fire("FF_SESSION_CHANGED")
+        end
+        FF:Fire("FF_DEALS_CHANGED", mode)
         FF.Log(string.format("deal %s: buy %d for %d, profit %d", c.info.name, deal.buy, deal.cost, deal.profit))
       else
         FF.Log(string.format("skip %s: %s", c.info.name, tostring(why)))
       end
-      FF:Fire("FF_SNIPER_STATUS", left > 0 and string.format("Checking candidates… %d left", left) or "Done")
-      if left == 0 then Sniper.Done(myRun, #results, #cands) end
+      progress(mode, p)
+      if p.done == p.total then Sniper.Done(mode, myRun) end
     end
-    c.commodity = isCommodity(c.key, c.info)
     if c.commodity then FF.Scan.Commodity(c.key.itemID, done) else FF.Scan.Items(c.key, done) end
   end
 end
 
--- "Keep scanning" is gentle on Blizzard's servers: a pause between rounds, and it stops by itself
--- after a while so it can't run for hours unattended.
-local RESCAN_PAUSE = 5           -- seconds between rounds (Blizzard's throttle paces the queries themselves)
-local RESCAN_MAX = 30 * 60       -- stop keep-scanning after 30 minutes
+-- "Keep scanning": a short pause between rounds, and it stops by itself after 30 minutes so it
+-- can't run for hours unattended. Blizzard's throttle paces the queries themselves.
+local RESCAN_PAUSE = 5
+local RESCAN_MAX = 30 * 60
 
-function Sniper.Done(myRun, nItems, nCands)
+function Sniper.Done(mode, myRun)
   if myRun ~= runID then return end
-  local msg = string.format("Done: %d items, %d candidates, %d deals", nItems, nCands, #Sniper.deals)
-  if FF.db.sniper.autoRescan and Sniper.running then
+  local p = Sniper.progress[mode]
+  p.current = nil
+  if Sniper.Config(mode).autoRescan and Sniper.running then
     keepSince = keepSince or GetTime()
     if GetTime() - keepSince > RESCAN_MAX then
       keepSince, Sniper.running = nil, false
-      FF:Fire("FF_SNIPER_STATUS", msg .. ". Keep scanning stopped after 30 minutes; press Scan to start again.")
-      return
+      p.state = "Done"
+      p.note = "Keep scanning stopped after 30 minutes. Press Start scan to go again."
+      return progress(mode, p)
     end
-    FF:Fire("FF_SNIPER_STATUS", msg .. string.format(". Next round in %d s.", RESCAN_PAUSE))
+    p.state = "Waiting"
+    p.note = string.format("Next round in %d s", RESCAN_PAUSE)
+    progress(mode, p)
     C_Timer.After(RESCAN_PAUSE, function()
       if myRun == runID and Sniper.running and AuctionHouseFrame and AuctionHouseFrame:IsShown() then
-        Sniper.Start(true)
+        Sniper.Start(mode, true)
       end
     end)
   else
     keepSince, Sniper.running = nil, false
-    FF:Fire("FF_SNIPER_STATUS", msg)
+    p.state = "Done"
+    progress(mode, p)
   end
 end
 
-FF:On("AUCTION_HOUSE_CLOSED", function() Sniper.running = false; runID = runID + 1 end)
+FF:On("AUCTION_HOUSE_CLOSED", function()
+  Sniper.running = false
+  runID = runID + 1
+  if Sniper.mode then local p = Sniper.progress[Sniper.mode]; p.state = "Idle"; p.current = nil end
+end)
