@@ -6,7 +6,10 @@ FF.Scan = Scan
 
 local AH = C_AuctionHouse
 local queue, job = {}, nil
-local TIMEOUT = 15      -- seconds to wait for an answer before moving on
+local TIMEOUT = 8       -- seconds to wait for an answer before retrying
+local MAX_TRIES = 2     -- send a query at most twice before skipping it
+local STALL_LIMIT = 4   -- this many skipped queries in a row: the AH stopped answering, give up
+local unanswered = 0
 local PRICE_SORT = { { sortOrder = Enum.AuctionHouseSortOrder.Price, reverseSort = false } }
 
 local function isOpen()
@@ -16,6 +19,7 @@ end
 local function finish(result)
   local j = job
   job = nil
+  if result ~= nil then unanswered = 0 end
   if j and j.cb then
     local ok, err = pcall(j.cb, result)
     if not ok then FF.Log("scan callback: " .. tostring(err)); geterrorhandler()(err) end
@@ -31,10 +35,42 @@ function Scan.Next()
     return
   end
   job = table.remove(queue, 1)
-  job.started = GetTime()
-  local thisJob = job
+  Scan.Send(job)
+end
+
+-- The auction house stopped answering (often because Blizzard's own window is searching at the same
+-- time): drop everything and tell the pages, instead of crawling on with timeouts.
+function Scan.Stall()
+  FF.Log("auction house stopped answering; scan stopped")
+  job, queue, unanswered = nil, {}, 0
+  FF:Fire("FF_SCAN_STALLED")
+end
+
+-- (re)send the current job's query when the throttle allows
+function Scan.Resend()
+  local j = job
+  if not j then return end
+  if not AH.IsThrottledMessageSystemReady() then
+    C_Timer.After(0.2, function() if job == j then Scan.Resend() end end)
+    return
+  end
+  Scan.Send(j)
+end
+
+function Scan.Send(j)
+  j.tries = (j.tries or 0) + 1
+  local token = {}
+  j.token = token
   C_Timer.After(TIMEOUT, function()
-    if job == thisJob then FF.Log("timeout: " .. thisJob.kind); finish(nil) end
+    if job ~= j or j.token ~= token then return end
+    if j.tries < MAX_TRIES then
+      FF.Log("no answer, asking again: " .. j.kind)
+      Scan.Resend()
+    else
+      FF.Log("timeout: " .. j.kind)
+      unanswered = unanswered + 1
+      if unanswered >= STALL_LIMIT then Scan.Stall() else finish(nil) end
+    end
   end)
   if job.kind == "browse" then
     job.results = {}
@@ -157,4 +193,8 @@ FF:On("OWNED_AUCTIONS_UPDATED", function()
 end)
 
 FF:On("AUCTION_HOUSE_THROTTLED_SYSTEM_READY", function() Scan.Next() end)
+-- Blizzard dropped our query (too busy): send it again right away instead of waiting for the timeout
+FF:On("AUCTION_HOUSE_THROTTLED_MESSAGE_DROPPED", function()
+  if job then FF.Log("query dropped, sending again: " .. job.kind); Scan.Resend() end
+end)
 FF:On("AUCTION_HOUSE_CLOSED", function() Scan.Clear(); FF:Fire("FF_SCAN_STOPPED") end)

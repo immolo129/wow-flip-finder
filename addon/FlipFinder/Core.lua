@@ -1,7 +1,7 @@
 -- Flip Finder: core. Settings, events, money formatting, logging and slash commands.
 local ADDON, FF = ...
 _G.FlipFinder = FF
-FF.version = "0.2.1"
+FF.version = "0.2.2"
 
 -- Settings. Money is in copper (1g = 10000), percentages are whole numbers.
 local DEFAULTS = {

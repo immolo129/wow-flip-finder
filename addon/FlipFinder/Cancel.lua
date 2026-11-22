@@ -113,6 +113,13 @@ FF:On("AUCTION_CANCELED", function(auctionID)
   changed()
 end)
 FF:On("AUCTION_HOUSE_CLOSED", function() Cancel.rows = {}; Cancel.state = "Idle" end)
+FF:On("FF_SCAN_STALLED", function()
+  local any = false
+  for _, r in ipairs(Cancel.rows) do
+    if r.state == "checking" then r.state, r.note, any = "ok", "AH didn't answer: scan again", true end
+  end
+  if any or Cancel.state == "Loading your auctions" then Cancel.state = "Scan again"; changed() end
+end)
 
 -- ---------- page ----------
 FF.UI.RegisterPage("cancel", function(parent)

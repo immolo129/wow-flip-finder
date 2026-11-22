@@ -289,6 +289,17 @@ function Sniper.Done(mode, myRun)
   end
 end
 
+FF:On("FF_SCAN_STALLED", function()
+  if not Sniper.running or not Sniper.mode then return end
+  local mode = Sniper.mode
+  Sniper.running = false
+  runID = runID + 1
+  local p = Sniper.progress[mode]
+  p.state, p.current = "Done", nil
+  p.note = "The auction house stopped answering (busy with another search?). Press Start scan again."
+  progress(mode, p)
+end)
+
 FF:On("AUCTION_HOUSE_CLOSED", function()
   Sniper.running = false
   runID = runID + 1

@@ -54,15 +54,22 @@ function Post.Price(row, ladder)
   local lowest = ladder and ladder[1] and ladder[1].price
   row.lowest = lowest
   local price, note
+  row.floor = floor
   if not lowest then
-    price, note = normal, "No competition: normal price"
+    price, note, row.why = normal, "No competition", "Nobody else is selling it, so it's listed at your normal % of value."
   else
-    price, note = lowest - cfg.undercut, "Undercuts the cheapest"
-    if price > cap then price, note = cap, "Capped at your max % of value" end
+    price, note, row.why = lowest - cfg.undercut, "Undercut", "1 step below the cheapest other listing."
+    if price > cap then price, note, row.why = cap, "Capped at max %", "The cheapest other listing is above your max % of value." end
   end
   price = math.floor(price)
-  if price < floor then return nil, "Cheapest is below your minimum (" .. FF.Money(floor) .. "): kept" end
-  if vendor > 0 and price <= vendor then return nil, "A vendor pays more: kept" end
+  if price < floor then
+    row.why = "The cheapest other listing is below your minimum (" .. FF.Money(floor) .. " = your min % of value), so it stays in your bags."
+    return nil, "Below your min: kept"
+  end
+  if vendor > 0 and price <= vendor then
+    row.why = "A vendor pays " .. FF.Money(vendor) .. ", at least as much as you'd get here."
+    return nil, "Vendor pays more: kept"
+  end
   return price, note
 end
 
@@ -82,7 +89,8 @@ function Post.Scan()
   Post.rows = {}
   for _, r in ipairs(bagItems()) do
     r.value = FF.Value(r.itemID)
-    if r.value and r.value >= cfg.minValue and (not cfg.onlyFlipped or FF.db.flipped[r.itemID]) then
+    -- worth listing if the whole stack is worth the minimum (one Heavy Leather is cheap, 35 aren't)
+    if r.value and r.value * r.qty >= cfg.minValue and (not cfg.onlyFlipped or FF.db.flipped[r.itemID]) then
       r.name = C_Item.GetItemNameByID(r.itemID) or (r.link and r.link:match("%[(.-)%]")) or ("Item " .. r.itemID)
       r.state = "checking"
       table.insert(Post.rows, r)
@@ -145,6 +153,13 @@ FF:On("AUCTION_HOUSE_SHOW_ERROR", function()
   if posting then posting.state, posting.note = "skip", "The game refused this post"; posting = nil; changed() end
 end)
 FF:On("AUCTION_HOUSE_CLOSED", function() posting = nil; Post.rows = {}; Post.state = "Idle" end)
+FF:On("FF_SCAN_STALLED", function()
+  local any = false
+  for _, r in ipairs(Post.rows) do
+    if r.state == "checking" then r.state, r.note, r.why, any = "skip", "AH didn't answer", "Press Scan bags again.", true end
+  end
+  if any then Post.state = "Scan again"; changed() end
+end)
 
 -- ---------- page ----------
 FF.UI.RegisterPage("post", function(parent)
@@ -167,7 +182,7 @@ FF.UI.RegisterPage("post", function(parent)
     K.numberField(set, "Undercut (copper)", cfg, "undercut", nil, "How far below the cheapest competitor to post."),
   }
   for i, f in ipairs(fields) do f:SetPoint("TOPLEFT", 14 + (i - 1) * 186, -12) end
-  local minv = K.numberField(set, "Min value (gold)", cfg, "minValue", 10000, "Skip items worth less than this.")
+  local minv = K.numberField(set, "Min stack value (gold)", cfg, "minValue", 10000, "Skip items whose whole stack in your bags is worth less than this.")
   minv:SetPoint("TOPLEFT", 14, -66)
   table.insert(fields, minv)
   local dur = K.dropdown(set, 170, function() return DURATIONS end,
@@ -223,7 +238,15 @@ FF.UI.RegisterPage("post", function(parent)
     end
     r.btn = button(r, "Post", 86, 22, "primary", function() if r.data then Post.Do(r.data) end end)
     r.btn:SetPoint("RIGHT", -12, 0)
-    r:SetScript("OnEnter", function(s) if s.data then GameTooltip:SetOwner(s, "ANCHOR_RIGHT"); GameTooltip:SetHyperlink(s.data.link or ("item:" .. s.data.itemID)); GameTooltip:Show() end end)
+    r:SetScript("OnEnter", function(s)
+      local d = s.data
+      if not d then return end
+      GameTooltip:SetOwner(s, "ANCHOR_RIGHT")
+      GameTooltip:SetHyperlink(d.link or ("item:" .. d.itemID))
+      if d.why then GameTooltip:AddLine(" "); GameTooltip:AddLine(d.why, 0.95, 0.72, 0.11, true) end
+      if d.floor then GameTooltip:AddDoubleLine("Your minimum", FF.Money(d.floor), 1, 1, 1) end
+      GameTooltip:Show()
+    end)
     r:SetScript("OnLeave", GameTooltip_Hide)
     rows[i] = r
     return r
