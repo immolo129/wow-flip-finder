@@ -143,6 +143,7 @@ FF.UI.RegisterPage("earnings", function(parent)
   local only = K.checkbox(page, "Only items I flipped", function() return opts.onlyFlipped end,
     function(v) opts.onlyFlipped = v; page:Refresh() end)
   only:SetPoint("TOPRIGHT", -380, -20)
+  sub:SetPoint("RIGHT", only, "LEFT", -16, 0)
 
   -- stat cards
   local cards = {}

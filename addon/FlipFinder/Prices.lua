@@ -11,6 +11,7 @@ local SOURCES = {
   saleRate   = "DBRegionSaleRate",   -- chance that a posted auction sells (region)
   soldPerDay = "DBRegionSoldPerDay", -- units sold per day (region)
   numAuctions = "DBNumAuctions",
+  vendorSell = "VendorSell",         -- what a vendor pays (TSM knows it for every item)
 }
 FF.SourceKeys = { "realm", "minBuyout", "historical", "region", "sale", "saleRate", "soldPerDay", "numAuctions" }
 FF.SourceNames = { realm = "Realm value", region = "Region value", sale = "Region sold value" }

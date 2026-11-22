@@ -357,7 +357,7 @@ local function buildSniperPage(parent, mode)
   local lt = text(live, 13, COL.text); lt:SetPoint("TOPLEFT", PAD, -12); lt:SetText("Live opportunities")
   local count = text(live, 11, COL.muted); count:SetPoint("LEFT", lt, "RIGHT", 8, 0)
   local keep = checkbox(live, "Keep scanning", function() return cfg().autoRescan end, function(v) cfg().autoRescan = v end)
-  keep:SetPoint("TOPRIGHT", -112, -9)
+  keep:SetPoint("TOPRIGHT", -128, -9)
   local alerts = checkbox(live, "Alerts", function() return FF.db.alerts.sound end,
     function(v) FF.db.alerts.sound = v; FF.db.alerts.flash = v end)
   alerts:SetPoint("RIGHT", keep, "LEFT", -90, 0)
@@ -668,6 +668,7 @@ local function buildRulesPage(parent)
     function() return "Value: " .. FF.SourceNames[FF.db.sniper.priceSource] end, nil,
     function(v) FF.db.sniper.priceSource = v end)
   src:SetPoint("TOPRIGHT", -20, -18)
+  sub:SetPoint("RIGHT", src, "LEFT", -16, 0)
   table.insert(toggles, src)
 
   local first = section(-6, "Commodity Sniper", sniper, {
@@ -718,15 +719,15 @@ end
 
 -- ---------- main window ----------
 local NAV = {
-  { key = "commodity", name = "Commodity Sniper" },
-  { key = "items", name = "Item Sniper" },
-  { key = "vendor", name = "Vendor Sniper" },
-  { key = "rules", name = "Rules" },
+  { key = "commodity", name = "Commodity Sniper", icon = "Interface\\Icons\\INV_Misc_Herb_07" },
+  { key = "items", name = "Item Sniper", icon = "Interface\\Icons\\INV_Scroll_03" },
+  { key = "vendor", name = "Vendor Sniper", icon = "Interface\\Icons\\INV_Misc_Coin_01" },
+  { key = "rules", name = "Rules", icon = "Interface\\Icons\\INV_Misc_Note_01" },
   { sep = true },
-  { key = "post", name = "Post" },
-  { key = "cancel", name = "Cancel scan" },
+  { key = "post", name = "Post", icon = "Interface\\Icons\\INV_Letter_15" },
+  { key = "cancel", name = "Cancel scan", icon = "Interface\\Icons\\Spell_ChargeNegative" },
   { sep = true },
-  { key = "earnings", name = "Earnings" },
+  { key = "earnings", name = "Earnings", icon = "Interface\\Icons\\INV_Misc_Coin_02" },
 }
 
 function UI.Go(key)
@@ -737,6 +738,7 @@ function UI.Go(key)
     local on = n.key == key
     n.bar:SetShown(on); n.bg:SetShown(on)
     n.label:SetTextColor(unpack(on and COL.text or (n.soon and COL.dim or COL.muted)))
+    if n.icon then n.icon:SetDesaturated(not on); n.icon:SetAlpha(on and 1 or 0.6) end
   end
   if pages[key] then pages[key]:Refresh() end
 end
@@ -803,7 +805,11 @@ local function build()
       b.bg = b:CreateTexture(nil, "BACKGROUND"); b.bg:SetAllPoints(); b.bg:SetColorTexture(1, 1, 1, 0.05)
       b.bar = b:CreateTexture(nil, "ARTWORK"); b.bar:SetColorTexture(unpack(COL.gold))
       b.bar:SetPoint("TOPLEFT"); b.bar:SetPoint("BOTTOMLEFT"); b.bar:SetWidth(3)
-      b.label = text(b, 12, COL.muted); b.label:SetPoint("LEFT", 14, 0); b.label:SetText(n.name)
+      if n.icon then
+        b.icon = b:CreateTexture(nil, "ARTWORK"); b.icon:SetSize(16, 16); b.icon:SetPoint("LEFT", 12, 0)
+        b.icon:SetTexture(n.icon); b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+      end
+      b.label = text(b, 12, COL.muted); b.label:SetPoint("LEFT", n.icon and 36 or 14, 0); b.label:SetText(n.name)
       if n.soon then
         local s = text(b, 9, COL.dim); s:SetPoint("RIGHT", -8, 0); s:SetText("v0.2")
       end

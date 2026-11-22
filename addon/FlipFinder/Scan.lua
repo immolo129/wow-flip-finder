@@ -57,12 +57,19 @@ function Scan.Resend()
   Scan.Send(j)
 end
 
-function Scan.Send(j)
-  j.tries = (j.tries or 0) + 1
+-- (re)start the wait for an answer. Big browse results arrive in many pages, so every page restarts it.
+local function arm(j)
   local token = {}
   j.token = token
   C_Timer.After(TIMEOUT, function()
     if job ~= j or j.token ~= token then return end
+    if j.kind == "browse" and j.gotPage then
+      -- the pages stopped coming: use what arrived rather than nothing
+      local res = AH.GetBrowseResults() or {}
+      FF.Log("browse: no more pages after " .. #res .. " items, using those")
+      unanswered = 0
+      return finish(res)
+    end
     if j.tries < MAX_TRIES then
       FF.Log("no answer, asking again: " .. j.kind)
       Scan.Resend()
@@ -72,6 +79,11 @@ function Scan.Send(j)
       if unanswered >= STALL_LIMIT then Scan.Stall() else finish(nil) end
     end
   end)
+end
+
+function Scan.Send(j)
+  j.tries = (j.tries or 0) + 1
+  arm(j)
   if job.kind == "browse" then
     job.results = {}
     AH.SendBrowseQuery({ searchString = "", filters = {}, itemClassFilters = job.classFilters or {}, sorts = PRICE_SORT })
@@ -133,6 +145,8 @@ end
 
 local function browseUpdate()
   if not job or job.kind ~= "browse" then return end
+  job.gotPage = true
+  arm(job)   -- a page arrived: wait afresh for the next one
   if AH.HasFullBrowseResults() then
     browseDone()
   else

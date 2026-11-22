@@ -197,8 +197,12 @@ end
 
 -- what a vendor pays for one (from the game's item data; nil until the item is loaded)
 function Sniper.VendorPrice(itemID)
+  -- the game only knows it once the item is loaded; TSM knows it for every item
   local sell = select(11, C_Item.GetItemInfo(itemID))
-  if sell == nil and C_Item.RequestLoadItemDataByID then C_Item.RequestLoadItemDataByID(itemID) end
+  if sell == nil then
+    sell = FF.Raw("vendorSell", itemID)
+    if sell == nil and C_Item.RequestLoadItemDataByID then C_Item.RequestLoadItemDataByID(itemID) end
+  end
   return sell
 end
 
