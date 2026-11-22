@@ -66,6 +66,13 @@ There are no tests. To check a change, run demo mode, which needs no API keys an
 - Match the existing code style. Don't add type hints, classes or frameworks the code doesn't already use.
 
 ## In-game addon (`addon/FlipFinder`)
+**Blizzard's rules come first, always.** The owner wants the addon and the website within Blizzard's Terms of Use, addon policy and API terms at all times. Before adding anything, check it against these:
+- Every purchase, post, cancel or other action that spends or moves gold or items must come from the player's own click (an `OnClick` handler), one action per click. Never chain them, never trigger them from timers, events or loops, never auto-confirm.
+- Only Blizzard's addon API and TSM's public API. No memory reading, input automation, external programs driving the game, or anything that works around a protected function.
+- Be gentle on the servers: one auction-house query at a time, wait for `IsThrottledMessageSystemReady`, stop when the AH closes; "Keep scanning" pauses between rounds and stops by itself after 30 minutes.
+- Addon stays free, private and readable (no obfuscation, ads or payments). Website: respect Blizzard API rate limits and use the data privately.
+- If a requested feature would break these rules, say so and offer a compliant alternative instead of building it.
+
 - Lua for the WoW: Forever client (Interface 16001, client 1.60). Forever uses the **modern auction house API** (`C_AuctionHouse`, commodities vs items), like retail; Auctionator's `Source_ModernAH` with its `IsForever` branches is a good reference for quirks (copper prices allowed, 2/8/24 h durations, one AH per ruleset and faction).
 - Prices come from TradeSkillMaster's public API (`TSM_API.GetCustomPriceValue("DBMarket", "i:<id>")` etc.), see `Prices.lua`. TSM's desktop app keeps that data fresh.
 - Buying, posting and cancelling need a hardware click (protected API). Never automate them; scanning (search queries) is fine.

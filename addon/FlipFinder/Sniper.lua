@@ -30,6 +30,7 @@ end
 Sniper.deals = {}
 Sniper.running = false
 local runID = 0
+local keepSince = nil   -- when "Keep scanning" started (see Sniper.Done)
 
 -- AH cut: 5 % at the faction auction houses, 15 % at the neutral (Blackwater) one.
 local NEUTRAL_ZONES = { ["Booty Bay"] = true, ["Gadgetzan"] = true, ["Everlook"] = true }
@@ -111,7 +112,8 @@ function Sniper.Stop()
   FF:Fire("FF_SNIPER_STATUS", "Stopped")
 end
 
-function Sniper.Start()
+function Sniper.Start(isRescan)
+  if not isRescan then keepSince = nil end
   Sniper.Stop()
   Sniper.running = true
   runID = runID + 1
@@ -182,15 +184,30 @@ function Sniper.Candidates(results, myRun)
   end
 end
 
+-- "Keep scanning" is gentle on Blizzard's servers: a pause between rounds, and it stops by itself
+-- after a while so it can't run for hours unattended.
+local RESCAN_PAUSE = 15          -- seconds between rounds
+local RESCAN_MAX = 30 * 60       -- stop keep-scanning after 30 minutes
+
 function Sniper.Done(myRun, nItems, nCands)
   if myRun ~= runID then return end
-  FF:Fire("FF_SNIPER_STATUS", string.format("Done: %d items, %d candidates, %d deals", nItems, nCands, #Sniper.deals))
+  local msg = string.format("Done: %d items, %d candidates, %d deals", nItems, nCands, #Sniper.deals)
   if FF.db.sniper.autoRescan and Sniper.running then
-    C_Timer.After(5, function()
-      if myRun == runID and Sniper.running and AuctionHouseFrame and AuctionHouseFrame:IsShown() then Sniper.Start() end
+    keepSince = keepSince or GetTime()
+    if GetTime() - keepSince > RESCAN_MAX then
+      keepSince, Sniper.running = nil, false
+      FF:Fire("FF_SNIPER_STATUS", msg .. ". Keep scanning stopped after 30 minutes; press Scan to start again.")
+      return
+    end
+    FF:Fire("FF_SNIPER_STATUS", msg .. string.format(". Next round in %d s.", RESCAN_PAUSE))
+    C_Timer.After(RESCAN_PAUSE, function()
+      if myRun == runID and Sniper.running and AuctionHouseFrame and AuctionHouseFrame:IsShown() then
+        Sniper.Start(true)
+      end
     end)
   else
-    Sniper.running = false
+    keepSince, Sniper.running = nil, false
+    FF:Fire("FF_SNIPER_STATUS", msg)
   end
 end
 
