@@ -1,7 +1,7 @@
 -- Flip Finder: core. Settings, events, money formatting, logging and slash commands.
 local ADDON, FF = ...
 _G.FlipFinder = FF
-FF.version = "0.6.0"
+FF.version = "0.7.0"
 
 -- Settings. Money is in copper (1g = 10000), percentages are whole numbers.
 local DEFAULTS = {
@@ -70,6 +70,11 @@ local DEFAULTS = {
   nextListID = 0,
   recipes = {},             -- per character: the recipes read from the profession windows
   craftOpts = { profession = "", source = "market", onlyProfitable = false },
+  minimap = { angle = 215, hide = false },
+  watch = {},               -- price alerts: itemID -> { price, seen, seenAt, alertedAt }
+  history = {},             -- price history recorded from scans: itemID -> { {time, lowest, market}, ... }
+  tracked = {},             -- items whose price history is recorded even if on no list
+  historyRange = 7,
   earnings = { range = 7, onlyFlipped = false },
   page = "commodity",
   log = {},
@@ -176,9 +181,15 @@ SlashCmdList.FLIPFINDER = function(msg)
       FF.Print(key, tostring(v))
       FF.Log("debug " .. id .. " " .. key .. "=" .. tostring(v))
     end
+  elseif cmd == "item" then
+    -- /ff item [item link]: the item window with its price history
+    local id = rest and tonumber(rest:match("item:(%d+)") or rest)
+    if id then FF.History.Open(id) else FF.Print("usage: /ff item [shift-click an item]") end
+  elseif cmd == "minimap" then
+    FF.MinimapButton.Toggle()
   elseif cmd == "log" then
     for i = math.max(1, #FF.db.log - 15), #FF.db.log do FF.Print(FF.db.log[i]) end
   else
-    FF.Print("/ff  open or close the window · /ff tooltip  tooltip lines on/off · /ff debug [item]  raw TSM values · /ff log  recent log")
+    FF.Print("/ff  open or close · /ff item [item]  price history · /ff minimap  show/hide the minimap button · /ff tooltip  tooltip lines on/off · /ff debug [item]  raw TSM values · /ff log  recent log")
   end
 end

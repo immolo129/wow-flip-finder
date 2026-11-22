@@ -203,6 +203,16 @@ sales data (keep TSM and its desktop app running), so it needs no other setup.
 - **Collect auction mail:** a button next to the mailbox. One click takes the gold and items from auction mail
   (sales, purchases, expired and cancelled auctions) one at a time, like Blizzard's own "Open All". It never
   touches COD mail, stops when your bags are full, and records sales for Earnings before taking them.
+- **Price alerts:** "tell me when Black Lotus is below 30g". Every scan checks the prices it sees; *Check now*
+  and *Keep checking* (every minute while the auction house is open, stops after 30 minutes) look up just your
+  alert items. An alert shows on screen, plays a sound, prints in chat and flashes the taskbar icon (at most once
+  every 10 minutes per item). Alerts only notify; nothing is bought by itself.
+- **Price history:** right-click a deal or crafting row, click an item on a list or alert, or `/ff item` + item:
+  a window with the item's numbers and a chart of the lowest price seen and TSM's market value (24 h / 3 / 7 days).
+  TSM doesn't share its history with other addons, so Flip Finder records its own from your scans, for items on
+  your lists, alerts, deals and recipes: it fills in as you scan, kept for 7 days.
+- **Minimap button:** left-click opens or closes Flip Finder, right-click opens Price alerts, drag to move it.
+  `/ff minimap` hides or shows it.
 - **Deals list:** click a column header to sort (again to reverse), type in *Filter items* to narrow it down, and
   click a row to see the exact listings you'd buy and what comes after them. Columns include sell chance, days to
   resell at the current pace, and the price gap (with a small bar). *Alerts* plays a sound and flashes new deals

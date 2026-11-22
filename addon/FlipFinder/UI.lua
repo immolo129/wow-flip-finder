@@ -487,7 +487,12 @@ local function buildSniperPage(parent, mode)
       if d.isCommodity then buyCommodity(d) else buyItems(d) end
       UI.Refresh()
     end)
-    r:SetScript("OnClick", function(s) if s.deal then s.deal.expanded = not s.deal.expanded; page:Refresh() end end)
+    r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    r:SetScript("OnClick", function(s, mouse)
+      if not s.deal then return end
+      if mouse == "RightButton" then FF.History.Open(s.deal.itemID); return end
+      s.deal.expanded = not s.deal.expanded; page:Refresh()
+    end)
     r:SetScript("OnEnter", function(s)
       s.hl:Show()
       local d = s.deal; if not d then return end
@@ -496,7 +501,7 @@ local function buildSniperPage(parent, mode)
       GameTooltip:AddLine(" ")
       GameTooltip:AddDoubleLine("Value (" .. (FF.SourceNames[FF.db.sniper.priceSource] or "") .. ")", FF.Money(d.value), 1, 1, 1)
       GameTooltip:AddDoubleLine("AH cut used", string.format("%d%%", d.cut * 100), 1, 1, 1, 1, 1, 1)
-      GameTooltip:AddLine("Click the row to see the listings you'd buy.", 0.56, 0.56, 0.6)
+      GameTooltip:AddLine("Click: the listings you'd buy · Right-click: price history", 0.56, 0.56, 0.6)
       GameTooltip:Show()
     end)
     r:SetScript("OnLeave", function(s) s.hl:Hide(); GameTooltip:Hide() end)
@@ -738,6 +743,7 @@ local NAV = {
   { key = "items", name = "Item Sniper", icon = "Interface\\Icons\\INV_Scroll_03" },
   { key = "vendor", name = "Vendor Sniper", icon = "Interface\\Icons\\INV_Misc_Coin_01" },
   { key = "lists", name = "Lists", icon = "Interface\\Icons\\INV_Misc_Bag_08" },
+  { key = "alerts", name = "Price alerts", icon = "Interface\\Icons\\INV_Misc_PocketWatch_01" },
   { key = "rules", name = "Rules", icon = "Interface\\Icons\\INV_Misc_Note_01" },
   { sep = true },
   { key = "post", name = "Post", icon = "Interface\\Icons\\INV_Letter_15" },

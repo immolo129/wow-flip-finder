@@ -199,7 +199,11 @@ FF.UI.RegisterPage("lists", function(parent)
         r.remove = button(r, "x", 24, 22, "ghost")
         r.remove:SetPoint("RIGHT", -12, 0)
         r:EnableMouse(true)
-        r:SetScript("OnEnter", function(s) GameTooltip:SetOwner(s, "ANCHOR_RIGHT"); GameTooltip:SetItemByID(s.itemID); GameTooltip:Show() end)
+        r:SetScript("OnEnter", function(s)
+          GameTooltip:SetOwner(s, "ANCHOR_RIGHT"); GameTooltip:SetItemByID(s.itemID)
+          GameTooltip:AddLine("Click for the price history.", 0.56, 0.56, 0.6); GameTooltip:Show()
+        end)
+        r:SetScript("OnMouseUp", function(s) FF.History.Open(s.itemID) end)
         r:SetScript("OnLeave", GameTooltip_Hide)
         rows[i] = r
       end

@@ -20,6 +20,16 @@ local function finish(result)
   local j = job
   job = nil
   if result ~= nil then unanswered = 0 end
+  -- tell price history and alerts what was seen (lowest price per item)
+  if j and result then
+    if j.kind == "browse" then
+      FF:Fire("FF_BROWSE_SEEN", result)
+    elseif j.kind == "commodity" then
+      FF:Fire("FF_PRICE_SEEN", j.itemID, result[1] and result[1].price)
+    elseif j.kind == "items" and j.itemKey then
+      FF:Fire("FF_PRICE_SEEN", j.itemKey.itemID, result[1] and result[1].price)
+    end
+  end
   if j and j.cb then
     local ok, err = pcall(j.cb, result)
     if not ok then FF.Log("scan callback: " .. tostring(err)); geterrorhandler()(err) end
