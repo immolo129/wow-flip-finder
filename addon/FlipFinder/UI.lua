@@ -539,6 +539,8 @@ local NAV = {
   { sep = true },
   { key = "post", name = "Post" },
   { key = "cancel", name = "Cancel scan" },
+  { sep = true },
+  { key = "earnings", name = "Earnings" },
 }
 
 function UI.Go(key)

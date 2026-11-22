@@ -185,5 +185,10 @@ sales data (keep TSM and its desktop app running), so it needs no other setup.
 - **Cancel scan:** *Scan my auctions* checks each of your auctions against the competition and lists the
   undercut ones (or says to keep it up if the competitor is below your minimum). **Cancel next** cancels one
   per click; the items go to your mailbox, ready to post again.
+- **Earnings:** what you've spent on flips and earned from sales, per day (green and red bars) with a gold
+  line for your running profit; 7 days / 30 days / all time, optionally only items you flipped. Purchases are
+  recorded when you buy through Flip Finder; sales are read from Blizzard's "Auction successful" mails when
+  you open your mailbox (read only: the addon never takes mail or money).
+- **Keep scanning** keeps deals on the list between rounds; a deal only disappears when it's gone or no longer cheap.
 - `/ff tooltip` turns the tooltip lines on/off, `/ff debug` + shift-click an item shows TSM's raw values,
   `/ff log` shows recent activity.

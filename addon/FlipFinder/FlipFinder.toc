@@ -2,7 +2,7 @@
 ## Title: Flip Finder
 ## Notes: Private flipping helper for WoW: Forever. Finds deals on the auction house using TradeSkillMaster's price and sales data.
 ## Author: immolo129
-## Version: 0.2.2
+## Version: 0.3.0
 ## OptionalDeps: TradeSkillMaster
 ## SavedVariables: FlipFinderDB
 ## IconTexture: Interface\Icons\INV_Misc_Coin_02
@@ -15,3 +15,4 @@ Sniper.lua
 UI.lua
 Post.lua
 Cancel.lua
+Ledger.lua

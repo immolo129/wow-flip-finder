@@ -136,6 +136,34 @@ function Sniper.EvaluateItems(itemID, ladder, value, cfg, cut)
   }
 end
 
+-- deals the player is buying (or bought) stay on the list whatever a new round finds
+local BUSY = { starting = true, confirm = true, buying = true, refreshing = true, ready = true, bought = true }
+
+-- Put a fresh result for an item into the list: a new deal replaces the old one, no deal removes it,
+-- unless the player is in the middle of buying it.
+function Sniper.Merge(mode, itemID, deal)
+  local list = Sniper.deals[mode]
+  for i, d in ipairs(list) do
+    if d.itemID == itemID then
+      if BUSY[d.state] then d.stale = nil; return false end
+      if deal then list[i] = deal else table.remove(list, i) end
+      return true
+    end
+  end
+  if deal then table.insert(list, deal); return true end
+  return false
+end
+
+-- After a round: drop deals that weren't seen again (no longer cheap, or gone), except busy ones.
+function Sniper.DropStale(mode)
+  local list, kept = Sniper.deals[mode], {}
+  for _, d in ipairs(list) do
+    if not d.stale or BUSY[d.state] then d.stale = nil; table.insert(kept, d) end
+  end
+  Sniper.deals[mode] = kept
+  FF:Fire("FF_DEALS_CHANGED", mode)
+end
+
 -- ---------- running a scan ----------
 -- mode "commodity": stackables, gap rules (FF.db.sniper). mode "items": single auctions (FF.db.items).
 Sniper.deals = { commodity = {}, items = {} }
@@ -153,6 +181,7 @@ function FF.RecordPurchase(deal)
   local s = FF.session
   s.bought, s.invested, s.projected = s.bought + 1, s.invested + deal.cost, s.projected + deal.profit
   FF.db.flipped[deal.itemID] = time()   -- the Post page can offer "only items I flipped"
+  if FF.Ledger then FF.Ledger.AddBuy(deal) end
   FF:Fire("FF_SESSION_CHANGED")
 end
 
@@ -181,7 +210,12 @@ function Sniper.Start(mode, isRescan)
   local myRun = runID
   local cfg = Sniper.Config(mode)
   local group = Sniper.Group(cfg.group)
-  Sniper.deals[mode] = {}
+  if isRescan then
+    -- keep last round's deals on screen; each is re-checked this round (see Sniper.Merge)
+    for _, d in ipairs(Sniper.deals[mode]) do d.stale = true end
+  else
+    Sniper.deals[mode] = {}
+  end
   FF:Fire("FF_DEALS_CHANGED", mode)
   progress(mode, { state = "Browsing", group = group.name, total = 0, done = 0, listed = 0, deals = 0 })
   FF.Log("sniper start: " .. mode .. " " .. group.key)
@@ -235,9 +269,8 @@ function Sniper.Candidates(mode, results, myRun)
       if deal then
         deal.itemKey, deal.name, deal.quality, deal.link = c.key, c.info.name, c.info.quality, c.info.link
         deal.isCommodity, deal.stats, deal.mode = c.commodity, FF.Stats(c.key.itemID), mode
-        local list = Sniper.deals[mode]
-        table.insert(list, deal)
-        table.sort(list, function(a, b) return a.profit > b.profit end)
+        Sniper.Merge(mode, c.key.itemID, deal)
+        table.sort(Sniper.deals[mode], function(a, b) return a.profit > b.profit end)
         p.deals = p.deals + 1
         local id = c.key.itemID .. ":" .. deal.top
         if not FF.session.seen[id] then
@@ -248,6 +281,7 @@ function Sniper.Candidates(mode, results, myRun)
         FF:Fire("FF_DEALS_CHANGED", mode)
         FF.Log(string.format("deal %s: buy %d for %d, profit %d", c.info.name, deal.buy, deal.cost, deal.profit))
       else
+        if Sniper.Merge(mode, c.key.itemID, nil) then FF:Fire("FF_DEALS_CHANGED", mode) end
         FF.Log(string.format("skip %s: %s", c.info.name, tostring(why)))
       end
       progress(mode, p)
@@ -266,6 +300,7 @@ function Sniper.Done(mode, myRun)
   if myRun ~= runID then return end
   local p = Sniper.progress[mode]
   p.current = nil
+  Sniper.DropStale(mode)
   if Sniper.Config(mode).autoRescan and Sniper.running then
     keepSince = keepSince or GetTime()
     if GetTime() - keepSince > RESCAN_MAX then
