@@ -1,12 +1,13 @@
 -- Flip Finder: core. Settings, events, money formatting, logging and slash commands.
 local ADDON, FF = ...
 _G.FlipFinder = FF
-FF.version = "0.2.0"
+FF.version = "0.2.1"
 
 -- Settings. Money is in copper (1g = 10000), percentages are whole numbers.
 local DEFAULTS = {
   tooltip = true,
   showOnAH = true,
+  replaceAH = true,     -- Flip Finder takes the place of Blizzard's auction house window
   sniper = {
     group = "materials",
     priceSource = "realm",  -- realm = DBMarket, region = DBRegionMarketAvg, sale = DBRegionSaleAvg

@@ -572,7 +572,16 @@ local function build()
   local ver = text(head, 10, COL.dim); ver:SetPoint("LEFT", logo, "RIGHT", 8, -1); ver:SetText("v" .. FF.version)
   local close = flatButton(head, "x", 26, 26, "ghost", function() frame:Hide() end)
   close:SetPoint("RIGHT", -10, 0)
-  frame.gold = pill(head, "", COL.gold); frame.gold:SetPoint("RIGHT", close, "LEFT", -10, 0)
+  frame.blizz = flatButton(head, "Blizzard AH", 96, 24, "ghost", function() UI.Undock() end)
+  frame.blizz:SetPoint("RIGHT", close, "LEFT", -10, 0)
+  frame.blizz:SetScript("OnEnter", function(s)
+    s:SetBackdropBorderColor(unpack(COL.gold))
+    GameTooltip:SetOwner(s, "ANCHOR_BOTTOM"); GameTooltip:SetText("Switch to Blizzard's auction house window", 1, 1, 1)
+    GameTooltip:AddLine("The Flip Finder button on it switches back.", nil, nil, nil, true); GameTooltip:Show()
+  end)
+  frame.blizz:HookScript("OnLeave", GameTooltip_Hide)
+  frame.blizz:Hide()
+  frame.gold = pill(head, "", COL.gold); frame.gold:SetPoint("RIGHT", frame.blizz, "LEFT", -10, 0)
   frame.tsm = pill(head, "", COL.green); frame.tsm:SetPoint("RIGHT", frame.gold, "LEFT", -6, 0)
   frame.region = pill(head, "", COL.muted); frame.region:SetPoint("RIGHT", frame.tsm, "LEFT", -6, 0)
   frame.faction = pill(head, "", COL.muted); frame.faction:SetPoint("RIGHT", frame.region, "LEFT", -6, 0)
@@ -623,6 +632,7 @@ local function build()
   frame.status:SetJustifyH("LEFT")
 
   frame:SetScript("OnShow", function() UI.Header(); UI.Go(FF.db.page or "commodity") end)
+  frame:SetScript("OnHide", function() UI.OnHide() end)
   frame:Hide()
 end
 
@@ -647,9 +657,47 @@ function UI.Refresh()
   if frame and frame:IsShown() and pages[current] then pages[current]:Refresh() end
 end
 
+-- ---------- one auction house window ----------
+-- At the auction house, Flip Finder takes the place of Blizzard's window (like TSM does): Blizzard's
+-- window stays open but invisible underneath (closing it would close the auction house). Only the
+-- look changes; buying, posting and cancelling still go through the player's own clicks.
+local docked = false
+local function ahOpen() return AuctionHouseFrame and AuctionHouseFrame:IsShown() end
+
+function UI.Dock()
+  if not frame then build() end
+  if not ahOpen() then return UI.Show() end
+  docked = true
+  FF.db.replaceAH = true
+  AuctionHouseFrame:SetAlpha(0)
+  frame:ClearAllPoints()
+  frame:SetPoint("TOPLEFT", AuctionHouseFrame, "TOPLEFT", 0, 0)
+  frame:SetFrameStrata("DIALOG")
+  frame:Show()
+  frame.blizz:Show()
+  if UI.ahButton then UI.ahButton:Hide() end
+end
+
+-- back to Blizzard's own auction house window
+function UI.Undock()
+  docked = false
+  FF.db.replaceAH = false
+  if AuctionHouseFrame then AuctionHouseFrame:SetAlpha(1) end
+  if UI.ahButton then UI.ahButton:Show() end
+  if frame then
+    frame.undocking = true
+    frame:Hide()
+    frame.undocking = nil
+  end
+end
+
+-- outside the auction house (/ff): a normal movable window
 function UI.Show()
   if not frame then build() end
-  if AuctionHouseFrame and AuctionHouseFrame:IsShown() then
+  if ahOpen() and FF.db.replaceAH ~= false then return UI.Dock() end
+  frame:SetFrameStrata("HIGH")
+  frame.blizz:SetShown(ahOpen() and true or false)
+  if ahOpen() then
     frame:ClearAllPoints()
     frame:SetPoint("TOPLEFT", AuctionHouseFrame, "TOPRIGHT", 6, 0)
   end
@@ -657,6 +705,15 @@ function UI.Show()
 end
 function UI.Toggle()
   if frame and frame:IsShown() then frame:Hide() else UI.Show() end
+end
+
+-- closing Flip Finder while it stands in for the auction house closes the auction house too
+function UI.OnHide()
+  if docked and not frame.undocking and ahOpen() then
+    docked = false
+    AuctionHouseFrame:SetAlpha(1)
+    C_AuctionHouse.CloseAuctionHouse()
+  end
 end
 
 -- ---------- events ----------
@@ -667,14 +724,22 @@ FF:On("PLAYER_MONEY", function() UI.Header() end)
 
 FF:On("AUCTION_HOUSE_SHOW", function()
   if not UI.ahButton and AuctionHouseFrame then
-    UI.ahButton = flatButton(AuctionHouseFrame, "Flip Finder", 100, 22, "primary", UI.Toggle)
+    -- on Blizzard's window: switch (back) to Flip Finder
+    UI.ahButton = flatButton(AuctionHouseFrame, "Flip Finder", 100, 22, "primary", function() UI.Dock() end)
     UI.ahButton:SetPoint("TOPRIGHT", AuctionHouseFrame, "TOPRIGHT", -60, -2)
     UI.ahButton:SetFrameLevel(AuctionHouseFrame:GetFrameLevel() + 20)
   end
-  if FF.db.showOnAH then UI.Show() end
+  if FF.db.replaceAH ~= false then
+    UI.Dock()
+  else
+    if UI.ahButton then UI.ahButton:Show() end
+    if FF.db.showOnAH then UI.Show() end
+  end
 end)
 FF:On("AUCTION_HOUSE_CLOSED", function()
   pending = nil
+  docked = false
+  if AuctionHouseFrame then AuctionHouseFrame:SetAlpha(1) end
   if frame then frame:Hide() end
 end)
 
