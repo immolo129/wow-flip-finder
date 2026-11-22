@@ -14,16 +14,30 @@ local function commodityStatus(loc)
   return ok and enum and status == enum.Commodity
 end
 
--- everything in the bags that can go on the auction house; commodities merged per item
-local function bagItems()
-  local out, merged = {}, {}
-  for bag = 0, NUM_BAG_SLOTS or 4 do
-    for slot = 1, C_Container.GetContainerNumSlots(bag) do
+-- last bag to look in: the backpack + 4 bags, plus the reagent bag (bag 5) when the client has one.
+-- Reagents like Essence of Water go straight into the reagent bag, so it must be included.
+local function lastBag()
+  return NUM_TOTAL_EQUIPPED_BAG_SLOTS or ((NUM_BAG_SLOTS or 4) + (NUM_REAGENTBAG_SLOTS or 1))
+end
+
+-- everything in the bags that can go on the auction house; commodities merged per item.
+-- Items that can't be listed go into `skipped` with the reason.
+local function bagItems(skipped)
+  local out, merged, seen = {}, {}, {}
+  for bag = 0, lastBag() do
+    for slot = 1, (C_Container.GetContainerNumSlots(bag) or 0) do
       local info = C_Container.GetContainerItemInfo(bag, slot)
-      if info and info.itemID and not info.isBound then
+      if info and info.itemID and info.isBound then
+        if not seen[info.itemID] then seen[info.itemID] = true; table.insert(skipped, { itemID = info.itemID, link = info.hyperlink, reason = "Soulbound" }) end
+      elseif info and info.itemID then
         local loc = ItemLocation:CreateFromBagAndSlot(bag, slot)
         local okValid, valid = pcall(AH.IsSellItemValid, loc, false)
-        if okValid and valid then
+        if not (okValid and valid) then
+          if not seen[info.itemID] then
+            seen[info.itemID] = true
+            table.insert(skipped, { itemID = info.itemID, link = info.hyperlink, reason = okValid and "The AH won't take it" or "AH check failed" })
+          end
+        else
           if commodityStatus(loc) then
             local r = merged[info.itemID]
             if r then
@@ -87,19 +101,46 @@ function Post.Scan()
   if not (AuctionHouseFrame and AuctionHouseFrame:IsShown()) then FF.Kit.status("Open the auction house first."); return end
   local cfg = FF.db.post
   Post.rows = {}
-  for _, r in ipairs(bagItems()) do
+  local skipped, kept, inBags = {}, {}, {}
+  local function nameOf(r) return C_Item.GetItemNameByID(r.itemID) or (r.link and r.link:match("%[(.-)%]")) or ("Item " .. r.itemID) end
+  for _, r in ipairs(bagItems(skipped)) do
+    inBags[r.itemID] = true
     r.value = FF.Value(r.itemID)
+    r.name = nameOf(r)
     -- worth listing if the whole stack is worth the minimum (one Heavy Leather is cheap, 35 aren't)
-    if r.value and r.value * r.qty >= cfg.minValue and (not cfg.onlyFlipped or FF.db.flipped[r.itemID]) then
-      r.name = C_Item.GetItemNameByID(r.itemID) or (r.link and r.link:match("%[(.-)%]")) or ("Item " .. r.itemID)
+    if not r.value then
+      r.state, r.note, r.why = "skip", "No TSM price", "TSM has no price for this item yet. Open the TSM app so it syncs, then /reload."
+      table.insert(kept, r)
+    elseif cfg.onlyFlipped and not FF.db.flipped[r.itemID] then
+      r.state, r.note, r.why = "skip", "Not flipped", "\"Only items I flipped\" is on and you didn't buy this with Flip Finder."
+      table.insert(kept, r)
+    elseif r.value * r.qty < cfg.minValue then
+      r.state, r.note = "skip", "Under min value"
+      r.why = "The stack is worth " .. FF.Money(r.value * r.qty) .. ", under your minimum of " .. FF.Money(cfg.minValue) .. ". Lower \"Min stack value\" to list it."
+      table.insert(kept, r)
+    else
       r.state = "checking"
       table.insert(Post.rows, r)
     end
   end
+  for _, s in ipairs(skipped) do
+    s.name = nameOf(s)
+    FF.Log("post: left out " .. s.name .. " (" .. s.itemID .. "): " .. s.reason)
+  end
+  for _, r in ipairs(kept) do FF.Log("post: kept " .. r.name .. " x" .. r.qty .. ": " .. r.note) end
+  -- bought with the sniper in the last 2 days but not in the bags? It's waiting in the mailbox.
+  local inMail = 0
+  for id, t in pairs(FF.db.flipped) do
+    if type(t) == "number" and time() - t < 2 * 86400 and not inBags[id] then inMail = inMail + 1 end
+  end
+  Post.hint = inMail > 0 and (inMail .. " item(s) you bought aren't in your bags: purchases arrive in the mailbox. Collect them, then scan again.") or nil
   Post.state = #Post.rows > 0 and "Checking prices" or "Nothing to post"
   Post.left = #Post.rows
+  for _, r in ipairs(kept) do table.insert(Post.rows, r) end
+  FF.Log(string.format("post scan: %d to price, %d kept, %d left out (bags 0-%d)", Post.left, #kept, #skipped, lastBag()))
+  if Post.hint then FF.Kit.status(Post.hint) end
   changed()
-  for _, r in ipairs(Post.rows) do
+  for _, r in ipairs(Post.rows) do if r.state == "checking" then
     local function priced(ladder)
       r.price, r.note = Post.Price(r, ladder)
       r.deposit = r.price and deposit(r) or nil
@@ -109,7 +150,8 @@ function Post.Scan()
       changed()
     end
     if r.isCommodity then FF.Scan.Commodity(r.itemID, priced) else FF.Scan.Items(r.itemKey, priced) end
-  end
+  end end
+  if Post.left == 0 then Post.state = #kept > 0 and "Nothing to post" or Post.state; changed() end
 end
 
 -- MUST be called from a click (Blizzard requires one for posting): posts this one row.

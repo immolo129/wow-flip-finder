@@ -56,6 +56,31 @@ function Sniper.Cut()
   return 0.05
 end
 
+-- Posting fee (deposit) for reselling `qty` of an item, at the duration set on the Post page.
+-- Commodities: Blizzard's own calculation. Other items need an item in the bags for that, so they
+-- use the deposit rate learned from commodities (deposit / vendor sell price), or a default.
+-- The deposit comes back when the item sells; it's counted as a cost so a deal still pays
+-- if the auction expires once.
+local DEFAULT_RATE = { 0.05, 0.20, 0.60 }   -- share of the vendor price for 2 / 8 / 24 h (estimate)
+function Sniper.Deposit(itemID, qty, isCommodity)
+  local d = FF.db.post.duration or 3
+  local vendor = select(11, C_Item.GetItemInfo(itemID)) or 0
+  if vendor == 0 and FF.Raw then vendor = FF.Raw("vendorSell", itemID) or 0 end
+  local key = d .. ":" .. Sniper.Cut()
+  if isCommodity then
+    local ok, dep = pcall(C_AuctionHouse.CalculateCommodityDeposit, itemID, d, qty)
+    if ok and type(dep) == "number" then
+      if vendor > 0 and dep > 0 then
+        FF.db.depositRate = FF.db.depositRate or {}
+        FF.db.depositRate[key] = dep / (vendor * qty)
+      end
+      return dep
+    end
+  end
+  local rate = FF.db.depositRate and FF.db.depositRate[key] or DEFAULT_RATE[d] or 0.6
+  return math.floor(vendor * qty * rate)
+end
+
 -- the listings a deal buys (rows 1..last) and the next few after them, for the expanded row
 local function ladderParts(ladder, last)
   local bought, after = {}, {}
@@ -100,14 +125,15 @@ function Sniper.Evaluate(itemID, ladder, value, cfg, cut)
 
   -- resell just under the next listing, but never above the value
   local sell = nextPrice and math.min(nextPrice - 1, value) or value
-  local profit = buy * sell * (1 - cut) - cost
+  local deposit = Sniper.Deposit(itemID, buy, true)
+  local profit = buy * sell * (1 - cut) - cost - deposit
   local roi = cost > 0 and profit / cost or 0
   if profit < cfg.minProfit then return nil, "profit too small" end
   if roi * 100 < cfg.minRoi then return nil, "ROI too small" end
   local rows, after = ladderParts(ladder, i - 1)
   return {
     itemID = itemID, buy = buy, cost = cost, top = top, sell = sell, profit = profit, roi = roi,
-    gap = gap, value = value, auctions = auctions, cut = cut, rows = rows, after = after,
+    gap = gap, value = value, auctions = auctions, cut = cut, deposit = deposit, rows = rows, after = after,
   }
 end
 
@@ -151,14 +177,15 @@ function Sniper.EvaluateItems(itemID, ladder, value, cfg, cut)
   if buy == 0 then return nil, "not cheap enough" end
   local nextPrice = ladder[i] and ladder[i].price
   local sell = nextPrice and math.min(nextPrice - 1, value) or value
-  local profit = buy * sell * (1 - cut) - cost
+  local deposit = Sniper.Deposit(itemID, buy, false)
+  local profit = buy * sell * (1 - cut) - cost - deposit
   local roi = cost > 0 and profit / cost or 0
   if profit < cfg.minProfit then return nil, "profit too small" end
   if roi * 100 < cfg.minRoi then return nil, "ROI too small" end
   local rows, after = ladderParts(ladder, i - 1)
   return {
     itemID = itemID, buy = buy, cost = cost, top = top, sell = sell, profit = profit, roi = roi,
-    gap = nextPrice and (nextPrice / top - 1) or math.huge, value = value, auctions = auctions, cut = cut,
+    gap = nextPrice and (nextPrice / top - 1) or math.huge, value = value, auctions = auctions, cut = cut, deposit = deposit,
     rows = rows, after = after,
   }
 end

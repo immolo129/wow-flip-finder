@@ -146,6 +146,49 @@ local function dropdown(parent, w, getChoices, getText, getRight, onPick)
   return d
 end
 
+-- A slim scrollbar for a scroll frame: shows there's more below, and the thumb can be dragged.
+-- Hidden when everything fits.
+local function scrollbar(scroll, content)
+  local track = CreateFrame("Frame", nil, scroll:GetParent())
+  track:SetPoint("TOPRIGHT", scroll, "TOPRIGHT", -2, -2); track:SetPoint("BOTTOMRIGHT", scroll, "BOTTOMRIGHT", -2, 2)
+  track:SetWidth(5); track:SetFrameLevel(scroll:GetFrameLevel() + 5)
+  local bg = track:CreateTexture(nil, "BACKGROUND"); bg:SetAllPoints(); bg:SetColorTexture(1, 1, 1, 0.05)
+  local thumb = CreateFrame("Frame", nil, track); thumb:SetWidth(5); thumb:EnableMouse(true)
+  local tt = thumb:CreateTexture(nil, "ARTWORK"); tt:SetAllPoints(); tt:SetColorTexture(unpack(COL.line2))
+  local function update()
+    local view, total = scroll:GetHeight(), content:GetHeight()
+    if total <= view + 1 or view <= 0 then track:Hide(); return end
+    track:Show()
+    local th = math.max(24, track:GetHeight() * view / total)
+    local max = total - view
+    local pos = max > 0 and scroll:GetVerticalScroll() / max or 0
+    thumb:SetHeight(th)
+    thumb:ClearAllPoints(); thumb:SetPoint("TOP", track, "TOP", 0, -(track:GetHeight() - th) * pos)
+  end
+  thumb:SetScript("OnEnter", function() tt:SetColorTexture(unpack(COL.gold)) end)
+  thumb:SetScript("OnLeave", function() if not thumb.drag then tt:SetColorTexture(unpack(COL.line2)) end end)
+  thumb:SetScript("OnMouseDown", function()
+    local _, startY = GetCursorPosition()
+    local startScroll, scale = scroll:GetVerticalScroll(), track:GetEffectiveScale()
+    thumb.drag = true
+    thumb:SetScript("OnUpdate", function()
+      local _, y = GetCursorPosition()
+      local max = content:GetHeight() - scroll:GetHeight()
+      local per = max / math.max(1, track:GetHeight() - thumb:GetHeight())
+      scroll:SetVerticalScroll(math.min(max, math.max(0, startScroll + (startY - y) / scale * per)))
+      update()
+    end)
+  end)
+  thumb:SetScript("OnMouseUp", function()
+    thumb.drag = nil; thumb:SetScript("OnUpdate", nil); tt:SetColorTexture(unpack(COL.line2))
+  end)
+  scroll:HookScript("OnVerticalScroll", update)
+  scroll:HookScript("OnSizeChanged", update)
+  content:HookScript("OnSizeChanged", update)
+  track:Hide()
+  return track
+end
+
 -- a text field with a grey placeholder
 local function input(parent, w, placeholder)
   local eb = CreateFrame("EditBox", nil, parent, "BackdropTemplate")
@@ -344,7 +387,7 @@ local function buildSniperPage(parent, mode)
     { "Opportunities", function() return tostring(FF.session.opps) end, function() return "Since " .. date("%H:%M", FF.session.since) end },
     { "Purchased", function() return tostring(FF.session.bought) end, function() return "Confirmed buys" end },
     { "Gold invested", function() return FF.Money(FF.session.invested) end, function() return "Purchase cost" end },
-    { "Projected profit", function() return FF.Money(FF.session.projected) end, function() return "After AH cut" end },
+    { "Projected profit", function() return FF.Money(FF.session.projected) end, function() return "After AH cut and deposits" end },
   }
   for i, def in ipairs(defs) do
     local c = box(page, COL.card, COL.line)
@@ -421,6 +464,7 @@ local function buildSniperPage(parent, mode)
     s:SetVerticalScroll(math.min(max, math.max(0, s:GetVerticalScroll() - delta * ROW_H * 2)))
   end)
   scroll:SetScript("OnSizeChanged", function(s, w) content:SetWidth(w) end)
+  scrollbar(scroll, content)
   local empty = text(live, 12, COL.dim); empty:SetPoint("CENTER", scroll, "CENTER")
 
   -- column x positions for the current width; the item column takes what's left
@@ -501,6 +545,10 @@ local function buildSniperPage(parent, mode)
       GameTooltip:AddLine(" ")
       GameTooltip:AddDoubleLine("Value (" .. (FF.SourceNames[FF.db.sniper.priceSource] or "") .. ")", FF.Money(d.value), 1, 1, 1)
       GameTooltip:AddDoubleLine("AH cut used", string.format("%d%%", d.cut * 100), 1, 1, 1, 1, 1, 1)
+      if d.deposit then
+        GameTooltip:AddDoubleLine("Posting fee (deposit)", FF.Money(d.deposit), 1, 1, 1, 1, 1, 1)
+        GameTooltip:AddLine("Profit already has the AH cut and the deposit taken off.", 0.56, 0.56, 0.6, true)
+      end
       GameTooltip:AddLine("Click: the listings you'd buy · Right-click: price history", 0.56, 0.56, 0.6)
       GameTooltip:Show()
     end)
@@ -871,7 +919,7 @@ end
 -- building blocks for pages in other files
 FF.Kit = {
   COL = COL, box = box, text = text, setFont = setFont, flatButton = flatButton, pill = pill, checkbox = checkbox,
-  dropdown = dropdown, numberField = numberField, input = input, W = W, SIDE = SIDE, ROW_H = ROW_H,
+  dropdown = dropdown, numberField = numberField, input = input, scrollbar = scrollbar, W = W, SIDE = SIDE, ROW_H = ROW_H,
   status = function(msg) status(msg) end,
 }
 
