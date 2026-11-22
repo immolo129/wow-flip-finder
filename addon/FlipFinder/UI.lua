@@ -908,7 +908,9 @@ function UI.Show()
   frame:Show()
 end
 function UI.Toggle()
-  if frame and frame:IsShown() then frame:Hide() else UI.Show() end
+  if frame and frame:IsShown() then frame:Hide()
+  elseif ahOpen() then UI.Dock()      -- /ff at the auction house always brings Flip Finder back
+  else UI.Show() end
 end
 
 -- closing Flip Finder while it stands in for the auction house closes the auction house too
@@ -934,19 +936,40 @@ FF:On("FF_SNIPER_PROGRESS", function() UI.Refresh() end)
 FF:On("FF_SESSION_CHANGED", function() UI.Refresh() end)
 FF:On("PLAYER_MONEY", function() UI.Header() end)
 
-FF:On("AUCTION_HOUSE_SHOW", function()
-  if not UI.ahButton and AuctionHouseFrame then
-    -- on Blizzard's window: switch (back) to Flip Finder
-    UI.ahButton = flatButton(AuctionHouseFrame, "Flip Finder", 100, 22, "primary", function() UI.Dock() end)
-    UI.ahButton:SetPoint("TOPRIGHT", AuctionHouseFrame, "TOPRIGHT", -60, -2)
-    UI.ahButton:SetFrameLevel(AuctionHouseFrame:GetFrameLevel() + 20)
-  end
+-- Blizzard's auction house window only exists once its code has loaded, and the "auction house opened"
+-- event can come before the window is visible. So we hook the window itself: whenever it appears,
+-- Flip Finder takes its place (or, in Blizzard mode, the switch-back button shows).
+local hooked = false
+local function hookAuctionHouse()
+  if hooked or not AuctionHouseFrame then return end
+  hooked = true
+  UI.ahButton = flatButton(AuctionHouseFrame, "Flip Finder", 110, 24, "primary", function() UI.Dock() end)
+  UI.ahButton:SetPoint("TOPRIGHT", AuctionHouseFrame, "TOPRIGHT", -70, -3)
+  UI.ahButton:SetFrameStrata("HIGH")
+  UI.ahButton:SetScript("OnEnter", function(s)
+    s:SetBackdropBorderColor(1, 1, 1, 1)
+    GameTooltip:SetOwner(s, "ANCHOR_BOTTOM"); GameTooltip:SetText("Switch to Flip Finder", 1, 1, 1); GameTooltip:Show()
+  end)
+  UI.ahButton:HookScript("OnLeave", GameTooltip_Hide)
+  AuctionHouseFrame:HookScript("OnShow", function() C_Timer.After(0, UI.OnAuctionHouseShown) end)
+end
+
+function UI.OnAuctionHouseShown()
+  if not ahOpen() then return end
   if FF.db.replaceAH ~= false then
     UI.Dock()
   else
     if UI.ahButton then UI.ahButton:Show() end
     if FF.db.showOnAH then UI.Show() end
   end
+end
+
+FF:On("ADDON_LOADED", function(name) if name == "Blizzard_AuctionHouseUI" then hookAuctionHouse() end end)
+FF:On("AUCTION_HOUSE_SHOW", function()
+  hookAuctionHouse()
+  -- the window may appear a moment after the event; try now and right after
+  C_Timer.After(0, UI.OnAuctionHouseShown)
+  C_Timer.After(0.2, UI.OnAuctionHouseShown)
 end)
 FF:On("AUCTION_HOUSE_CLOSED", function()
   pending = nil
