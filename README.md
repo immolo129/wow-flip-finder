@@ -161,3 +161,22 @@ In `.env` (PC) or as repository variables (GitHub):
 | `cloud.py`, `.github/workflows/collect.yml` | The hourly GitHub job |
 | `app.py` | Local web server with hourly fetch |
 | `config.py`, `storage.py`, `demo.py` | Settings, database, demo data |
+
+## In-game addon: Flip Finder
+
+A private flipping addon for WoW: Forever, in `addon/FlipFinder`. It uses **TradeSkillMaster's** price and
+sales data (keep TSM and its desktop app running), so it needs no other setup.
+
+- **Install / update:** double-click `install-addon.bat`, then `/reload` in game.
+- **Tooltips:** realm value, lowest buyout, region value, region sold value, daily sold and sell chance.
+- **Sniper** (opens next to the auction house, or `/ff`): pick a group (reagents & materials, consumables,
+  recipes, gear, …) and press **Scan**. It finds listings below *Max % of value* that pass the sales filter
+  (daily sold or sell chance), then checks each one's full price list for a **resell gap**: the cheap listings
+  must be followed by a price jump of at least *Resell gap %*, or there's nothing to resell into.
+  *Keep scanning* repeats the scan.
+- **Buying is always your click:** commodities are *Buy* then *Confirm* (the game shows the real total first);
+  single auctions are one click to refresh, then one click per auction. Bought items go to your mailbox.
+- **Settings:** max % of value, daily sold / sell chance, max quantity, resell gap, price tolerance, min ROI,
+  min quantity (bait filter), min quality, min profit, max spend, fast sellers first.
+- `/ff tooltip` turns the tooltip lines on/off, `/ff debug` + shift-click an item shows TSM's raw values,
+  `/ff log` shows recent activity.

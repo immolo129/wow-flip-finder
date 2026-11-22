@@ -64,3 +64,10 @@ There are no tests. To check a change, run demo mode, which needs no API keys an
 - Keep it small and dependency-light. Flask and requests are the only dependencies.
 - Use plain functions, short docstrings, and comments that explain *why*.
 - Match the existing code style. Don't add type hints, classes or frameworks the code doesn't already use.
+
+## In-game addon (`addon/FlipFinder`)
+- Lua for the WoW: Forever client (Interface 16001, client 1.60). Forever uses the **modern auction house API** (`C_AuctionHouse`, commodities vs items), like retail; Auctionator's `Source_ModernAH` with its `IsForever` branches is a good reference for quirks (copper prices allowed, 2/8/24 h durations, one AH per ruleset and faction).
+- Prices come from TradeSkillMaster's public API (`TSM_API.GetCustomPriceValue("DBMarket", "i:<id>")` etc.), see `Prices.lua`. TSM's desktop app keeps that data fresh.
+- Buying, posting and cancelling need a hardware click (protected API). Never automate them; scanning (search queries) is fine.
+- WoW is installed at `C:\Program Files (x86)\World of Warcraft\_forever_`. After the user plays, errors are in `WTF/Account/*/SavedVariables/BugSack.lua` and the addon's log in `.../SavedVariables/FlipFinder.lua` (written on logout or /reload).
+- Install with `install-addon.bat` (copies to the AddOns folder). No Lua runtime here; `luaparser` (pip) does syntax checks.
