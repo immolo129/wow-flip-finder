@@ -186,7 +186,7 @@ end
 
 -- "Keep scanning" is gentle on Blizzard's servers: a pause between rounds, and it stops by itself
 -- after a while so it can't run for hours unattended.
-local RESCAN_PAUSE = 15          -- seconds between rounds
+local RESCAN_PAUSE = 5           -- seconds between rounds (Blizzard's throttle paces the queries themselves)
 local RESCAN_MAX = 30 * 60       -- stop keep-scanning after 30 minutes
 
 function Sniper.Done(myRun, nItems, nCands)

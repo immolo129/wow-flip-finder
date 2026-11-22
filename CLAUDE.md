@@ -69,7 +69,7 @@ There are no tests. To check a change, run demo mode, which needs no API keys an
 **Blizzard's rules come first, always.** The owner wants the addon and the website within Blizzard's Terms of Use, addon policy and API terms at all times. Before adding anything, check it against these:
 - Every purchase, post, cancel or other action that spends or moves gold or items must come from the player's own click (an `OnClick` handler), one action per click. Never chain them, never trigger them from timers, events or loops, never auto-confirm.
 - Only Blizzard's addon API and TSM's public API. No memory reading, input automation, external programs driving the game, or anything that works around a protected function.
-- Be gentle on the servers: one auction-house query at a time, wait for `IsThrottledMessageSystemReady`, stop when the AH closes; "Keep scanning" pauses between rounds and stops by itself after 30 minutes.
+- Be gentle on the servers: one auction-house query at a time, wait for `IsThrottledMessageSystemReady`, stop when the AH closes; "Keep scanning" pauses 5 s between rounds and stops by itself after 30 minutes.
 - Addon stays free, private and readable (no obfuscation, ads or payments). Website: respect Blizzard API rate limits and use the data privately.
 - If a requested feature would break these rules, say so and offer a compliant alternative instead of building it.
 
