@@ -80,10 +80,19 @@ function Sniper.Evaluate(itemID, ladder, value, cfg, cut)
   local roi = cost > 0 and profit / cost or 0
   if profit < cfg.minProfit then return nil, "profit too small" end
   if roi * 100 < cfg.minRoi then return nil, "ROI too small" end
+  local rows, after = ladderParts(ladder, i - 1)
   return {
     itemID = itemID, buy = buy, cost = cost, top = top, sell = sell, profit = profit, roi = roi,
-    gap = gap, value = value, auctions = auctions, cut = cut,
+    gap = gap, value = value, auctions = auctions, cut = cut, rows = rows, after = after,
   }
+end
+
+-- the listings a deal buys (rows 1..last) and the next few after them, for the expanded row
+local function ladderParts(ladder, last)
+  local bought, after = {}, {}
+  for j = 1, last do table.insert(bought, { price = ladder[j].price, qty = ladder[j].qty }) end
+  for j = last + 1, math.min(#ladder, last + 3) do table.insert(after, { price = ladder[j].price, qty = ladder[j].qty }) end
+  return bought, after
 end
 
 local function itemInfo(itemKey)
@@ -130,9 +139,11 @@ function Sniper.EvaluateItems(itemID, ladder, value, cfg, cut)
   local roi = cost > 0 and profit / cost or 0
   if profit < cfg.minProfit then return nil, "profit too small" end
   if roi * 100 < cfg.minRoi then return nil, "ROI too small" end
+  local rows, after = ladderParts(ladder, i - 1)
   return {
     itemID = itemID, buy = buy, cost = cost, top = top, sell = sell, profit = profit, roi = roi,
     gap = nextPrice and (nextPrice / top - 1) or math.huge, value = value, auctions = auctions, cut = cut,
+    rows = rows, after = after,
   }
 end
 
@@ -146,11 +157,20 @@ function Sniper.Merge(mode, itemID, deal)
   for i, d in ipairs(list) do
     if d.itemID == itemID then
       if BUSY[d.state] then d.stale = nil; return false end
-      if deal then list[i] = deal else table.remove(list, i) end
-      return true
+      if deal then
+        deal.newAt, deal.expanded = d.newAt, d.expanded   -- keep its flash time and open/closed state
+        list[i] = deal
+        return "updated"
+      end
+      table.remove(list, i)
+      return "removed"
     end
   end
-  if deal then table.insert(list, deal); return true end
+  if deal then
+    deal.newAt = GetTime()
+    table.insert(list, deal)
+    return "new"
+  end
   return false
 end
 
@@ -269,8 +289,7 @@ function Sniper.Candidates(mode, results, myRun)
       if deal then
         deal.itemKey, deal.name, deal.quality, deal.link = c.key, c.info.name, c.info.quality, c.info.link
         deal.isCommodity, deal.stats, deal.mode = c.commodity, FF.Stats(c.key.itemID), mode
-        Sniper.Merge(mode, c.key.itemID, deal)
-        table.sort(Sniper.deals[mode], function(a, b) return a.profit > b.profit end)
+        if Sniper.Merge(mode, c.key.itemID, deal) == "new" then FF:Fire("FF_NEW_DEAL", mode, deal) end
         p.deals = p.deals + 1
         local id = c.key.itemID .. ":" .. deal.top
         if not FF.session.seen[id] then

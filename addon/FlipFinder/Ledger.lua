@@ -116,11 +116,10 @@ FF.UI.RegisterPage("earnings", function(parent)
   only:SetPoint("TOPRIGHT", -380, -20)
 
   -- stat cards
-  local cw = (K.W - K.SIDE - 40 - 3 * 12) / 4
   local cards = {}
   for i, name in ipairs({ "Earned", "Spent", "Profit", "Sales" }) do
     local c = box(page, COL.card, COL.line)
-    c:SetSize(cw, 64); c:SetPoint("TOPLEFT", 20 + (i - 1) * (cw + 12), -62)
+    c:SetHeight(64)
     c.k = text(c, 11, COL.muted); c.k:SetPoint("TOPLEFT", 12, -10); c.k:SetText(name)
     c.v = text(c, 18, COL.text); c.v:SetPoint("TOPLEFT", 12, -30)
     cards[i] = c
@@ -232,11 +231,13 @@ FF.UI.RegisterPage("earnings", function(parent)
   local rt = text(recent, 13, COL.text); rt:SetPoint("TOPLEFT", 14, -10); rt:SetText("Recent")
   local lines = {}
   for i = 1, 5 do
-    local fs = text(recent, 11, COL.text); fs:SetPoint("TOPLEFT", 14, -12 - i * 20); fs:SetWidth(K.W - K.SIDE - 80); fs:SetJustifyH("LEFT")
+    local fs = text(recent, 11, COL.text); fs:SetPoint("TOPLEFT", 14, -12 - i * 20); fs:SetPoint("RIGHT", -14, 0); fs:SetJustifyH("LEFT")
     lines[i] = fs
   end
 
   function page:Refresh()
+    local cw = (page:GetWidth() - 40 - 3 * 12) / 4
+    for i, c in ipairs(cards) do c:ClearAllPoints(); c:SetWidth(cw); c:SetPoint("TOPLEFT", 20 + (i - 1) * (cw + 12), -62) end
     for _, b in ipairs(rangeBtns) do b:SetStyle(b.value == opts.range and "primary" or "ghost") end
     only:Refresh()
     local days, tot = Ledger.Days(opts.range or nil, opts.onlyFlipped)
@@ -259,5 +260,6 @@ FF.UI.RegisterPage("earnings", function(parent)
     end
   end
   FF:On("FF_LEDGER_CHANGED", function() if page:IsShown() then page:Refresh() end end)
+  page:SetScript("OnSizeChanged", function() if page:IsShown() then page:Refresh() end end)
   return page
 end)

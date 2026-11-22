@@ -13,8 +13,12 @@ local COL = {
   text = { 0.93, 0.93, 0.95 }, muted = { 0.56, 0.56, 0.6 }, dim = { 0.38, 0.38, 0.42 },
   gold = { 0.95, 0.72, 0.11 }, goldText = { 0.1, 0.07, 0 }, green = { 0.29, 0.87, 0.5 }, red = { 0.97, 0.44, 0.44 },
 }
-local FONT = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
-local W, H, SIDE, HEAD = 980, 600, 176, 44
+-- Inter (SIL Open Font License, see Media/FONTS-LICENSE.txt); the game's font if it can't load
+local FONT = "Interface\\AddOns\\FlipFinder\\Media\\Inter-Regular.ttf"
+local FONT_B = "Interface\\AddOns\\FlipFinder\\Media\\Inter-SemiBold.ttf"
+local FALLBACK = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
+local W, H, SIDE, HEAD = 1120, 640, 176, 44      -- default size; the window can be resized
+local MIN_W, MIN_H = 1000, 560
 local ROW_H = 30
 
 local function box(parent, bg, border, level)
@@ -26,9 +30,15 @@ local function box(parent, bg, border, level)
   return f
 end
 
-local function text(parent, size, color, flags)
+local function setFont(obj, size, flags, bold)
+  if not obj:SetFont(bold and FONT_B or FONT, size or 12, flags or "") then obj:SetFont(FALLBACK, size or 12, flags or "") end
+end
+
+-- text: bold for headings (size 13+) unless told otherwise
+local function text(parent, size, color, flags, bold)
   local fs = parent:CreateFontString(nil, "OVERLAY")
-  fs:SetFont(FONT, size or 12, flags or "")
+  if bold == nil then bold = (size or 12) >= 13 end
+  setFont(fs, size, flags, bold)
   fs:SetTextColor(unpack(color or COL.text))
   fs:SetWordWrap(false)
   return fs
@@ -145,7 +155,7 @@ local function numberField(parent, caption, cfg, key, scale, tip)
   eb:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 })
   eb:SetBackdropColor(unpack(COL.field)); eb:SetBackdropBorderColor(unpack(COL.line2))
   eb:SetSize(164, 26); eb:SetPoint("TOPLEFT", cap, "BOTTOMLEFT", 0, -5)
-  eb:SetFont(FONT, 12, ""); eb:SetTextColor(unpack(COL.text)); eb:SetTextInsets(8, 8, 0, 0); eb:SetAutoFocus(false)
+  setFont(eb, 12, ""); eb:SetTextColor(unpack(COL.text)); eb:SetTextInsets(8, 8, 0, 0); eb:SetAutoFocus(false)
   local function show() local v = cfg()[key]; eb:SetText(scale and tostring(v / scale) or tostring(v)); eb:SetCursorPosition(0) end
   local function save() local v = tonumber(eb:GetText()); if v then cfg()[key] = scale and math.floor(v * scale + 0.5) or v end; show() end
   eb:SetScript("OnEnterPressed", function(s) save(); s:ClearFocus() end)
@@ -238,13 +248,38 @@ local function buyLabel(d)
 end
 
 -- ---------- sniper page (commodity or items) ----------
-local LIST_COLS = {
-  { "Item", 190, "LEFT" }, { "Qty", 40 }, { "Pay up to", 78 }, { "Cost", 78 }, { "Sell at", 78 },
-  { "Profit", 78 }, { "ROI", 44 }, { "Sold/day", 52 },
+-- Columns: key, header, width (the item column takes what's left), alignment, sort value.
+local function soldOf(d) return d.stats and d.stats.soldPerDay end
+local function chanceOf(d) return d.stats and d.stats.saleRate end
+local function daysOf(d) local s = soldOf(d); return s and s > 0 and d.buy / s or nil end
+local DEAL_COLS = {
+  { key = "name", label = "Item", width = 0, align = "LEFT", sort = function(d) return d.name or "" end },
+  { key = "buy", label = "Qty", width = 42, sort = function(d) return d.buy end },
+  { key = "top", label = "Pay up to", width = 74, sort = function(d) return d.top end },
+  { key = "cost", label = "Cost", width = 74, sort = function(d) return d.cost end },
+  { key = "sell", label = "Sell at", width = 74, sort = function(d) return d.sell end },
+  { key = "profit", label = "Profit", width = 78, sort = function(d) return d.profit end },
+  { key = "roi", label = "ROI", width = 46, sort = function(d) return d.roi end },
+  { key = "sold", label = "Sold/day", width = 54, sort = soldOf },
+  { key = "chance", label = "Sell %", width = 48, sort = chanceOf },
+  { key = "days", label = "Days", width = 44, sort = daysOf },
+  { key = "gap", label = "Gap", width = 66, sort = function(d) return d.gap end },
 }
+local BTN_W, PAD, ICON = 100, 14, 30
+
+local function fmtNum(v, dec) if not v then return "-" end return string.format(dec and "%.1f" or "%.0f", v) end
+local function listRow(rows) -- "12 x 2s 66c, 5 x 2s 67c"
+  local parts = {}
+  for _, r in ipairs(rows or {}) do table.insert(parts, r.qty .. " x " .. FF.Money(r.price)) end
+  return #parts > 0 and table.concat(parts, ",  ") or "none"
+end
 
 local function buildSniperPage(parent, mode)
   local cfg = function() return FF.Sniper.Config(mode) end
+  FF.db.sort = FF.db.sort or {}
+  FF.db.sort[mode] = FF.db.sort[mode] or { key = "profit", asc = false }
+  local sortState = FF.db.sort[mode]
+  local filterText = ""
   local page = CreateFrame("Frame", nil, parent)
   page:SetAllPoints()
   local isC = mode == "commodity"
@@ -286,19 +321,17 @@ local function buildSniperPage(parent, mode)
   local fast = checkbox(card, "Fast sellers first", function() return cfg().fastFirst ~= false end, function(v) cfg().fastFirst = v end)
   fast:SetPoint("RIGHT", rules, "LEFT", -150, 0)
 
-  -- stat cards
+  -- stat cards (they stretch with the window)
   local stats = {}
   local defs = {
     { "Opportunities", function() return tostring(FF.session.opps) end, function() return "Since " .. date("%H:%M", FF.session.since) end },
     { "Purchased", function() return tostring(FF.session.bought) end, function() return "Confirmed buys" end },
-    { "Gold invested", function() return money(FF.session.invested) end, function() return "Purchase cost" end },
-    { "Projected profit", function() return money(FF.session.projected) end, function() return "After AH cut" end },
+    { "Gold invested", function() return FF.Money(FF.session.invested) end, function() return "Purchase cost" end },
+    { "Projected profit", function() return FF.Money(FF.session.projected) end, function() return "After AH cut" end },
   }
-  local cw = (W - SIDE - 40 - 3 * 12) / 4
   for i, def in ipairs(defs) do
     local c = box(page, COL.card, COL.line)
-    c:SetSize(cw, 70)
-    c:SetPoint("TOPLEFT", 20 + (i - 1) * (cw + 12), -158)
+    c:SetHeight(70)
     c.k = text(c, 11, COL.muted); c.k:SetPoint("TOPLEFT", 12, -10); c.k:SetText(def[1])
     c.v = text(c, 18, COL.text); c.v:SetPoint("TOPLEFT", 12, -28)
     c.s = text(c, 10, COL.dim); c.s:SetPoint("TOPLEFT", 12, -52)
@@ -309,39 +342,91 @@ local function buildSniperPage(parent, mode)
     end
     stats[i] = c
   end
+  local function layoutCards()
+    local w = (page:GetWidth() - 40 - 3 * 12) / 4
+    for i, c in ipairs(stats) do
+      c:ClearAllPoints(); c:SetWidth(w); c:SetPoint("TOPLEFT", 20 + (i - 1) * (w + 12), -158)
+    end
+  end
 
   -- live opportunities
   local live = box(page, COL.card, COL.line)
   live:SetPoint("TOPLEFT", 20, -240); live:SetPoint("BOTTOMRIGHT", -20, 34)
-  local lt = text(live, 13, COL.text); lt:SetPoint("TOPLEFT", 14, -12); lt:SetText("Live opportunities")
+  local lt = text(live, 13, COL.text); lt:SetPoint("TOPLEFT", PAD, -12); lt:SetText("Live opportunities")
+  local count = text(live, 11, COL.muted); count:SetPoint("LEFT", lt, "RIGHT", 8, 0)
   local keep = checkbox(live, "Keep scanning", function() return cfg().autoRescan end, function(v) cfg().autoRescan = v end)
-  keep:SetPoint("TOPRIGHT", -110, -9)
+  keep:SetPoint("TOPRIGHT", -112, -9)
+  local alerts = checkbox(live, "Alerts", function() return FF.db.alerts.sound end,
+    function(v) FF.db.alerts.sound = v; FF.db.alerts.flash = v end)
+  alerts:SetPoint("RIGHT", keep, "LEFT", -90, 0)
+  alerts:SetScript("OnEnter", function(s) GameTooltip:SetOwner(s, "ANCHOR_TOP"); GameTooltip:SetText("Alerts", 1, 1, 1)
+    GameTooltip:AddLine("A sound and a gold flash when a new deal appears; the taskbar icon flashes if WoW is in the background.", nil, nil, nil, true); GameTooltip:Show() end)
+  alerts:SetScript("OnLeave", GameTooltip_Hide)
+  -- filter box
+  local filter = CreateFrame("EditBox", nil, live, "BackdropTemplate")
+  filter:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 })
+  filter:SetBackdropColor(unpack(COL.field)); filter:SetBackdropBorderColor(unpack(COL.line2))
+  filter:SetSize(170, 22); filter:SetPoint("RIGHT", alerts, "LEFT", -24, 0)
+  setFont(filter, 11, ""); filter:SetTextColor(unpack(COL.text)); filter:SetTextInsets(8, 8, 0, 0); filter:SetAutoFocus(false)
+  local hint = text(filter, 11, COL.dim); hint:SetPoint("LEFT", 8, 0); hint:SetText("Filter items…")
+  filter:SetScript("OnTextChanged", function(s) filterText = s:GetText():lower(); hint:SetShown(s:GetText() == ""); page:Refresh() end)
+  filter:SetScript("OnEscapePressed", function(s) s:SetText(""); s:ClearFocus() end)
+  filter:SetScript("OnEnterPressed", function(s) s:ClearFocus() end)
 
-  local x = 14
-  for _, col in ipairs(LIST_COLS) do
-    local h = text(live, 10, COL.muted)
-    h:SetWidth(col[2] - 6); h:SetJustifyH(col[3] or "RIGHT")
-    h:SetPoint("TOPLEFT", x + (col[1] == "Item" and 30 or 0), -40)
-    h:SetText(col[1]:upper())
-    x = x + col[2]
+  -- column headers (click to sort)
+  local headers = {}
+  local headRow = CreateFrame("Frame", nil, live)
+  headRow:SetPoint("TOPLEFT", 0, -36); headRow:SetPoint("TOPRIGHT", 0, -36); headRow:SetHeight(18)
+  for i, col in ipairs(DEAL_COLS) do
+    local h = CreateFrame("Button", nil, headRow)
+    h:SetHeight(18)
+    h.t = text(h, 10, COL.muted, nil, true); h.t:SetAllPoints(); h.t:SetJustifyH(col.align or "RIGHT")
+    h:SetScript("OnClick", function()
+      if sortState.key == col.key then sortState.asc = not sortState.asc
+      else sortState.key, sortState.asc = col.key, col.key == "name" end
+      page:Refresh()
+    end)
+    h:SetScript("OnEnter", function(s) s.t:SetTextColor(unpack(COL.text)) end)
+    h:SetScript("OnLeave", function() page:Refresh() end)
+    h.col = col
+    headers[i] = h
   end
   local sep = live:CreateTexture(nil, "ARTWORK"); sep:SetColorTexture(unpack(COL.line))
-  sep:SetPoint("TOPLEFT", 1, -54); sep:SetPoint("TOPRIGHT", -1, -54); sep:SetHeight(1)
+  sep:SetPoint("TOPLEFT", 1, -56); sep:SetPoint("TOPRIGHT", -1, -56); sep:SetHeight(1)
 
   local scroll = CreateFrame("ScrollFrame", nil, live)
-  scroll:SetPoint("TOPLEFT", 1, -55); scroll:SetPoint("BOTTOMRIGHT", -1, 60)
-  local content = CreateFrame("Frame", nil, scroll); content:SetSize(W - SIDE - 42, 1)
+  scroll:SetPoint("TOPLEFT", 1, -57); scroll:SetPoint("BOTTOMRIGHT", -1, 60)
+  local content = CreateFrame("Frame", nil, scroll); content:SetSize(1, 1)
   scroll:SetScrollChild(content)
   scroll:EnableMouseWheel(true)
   scroll:SetScript("OnMouseWheel", function(s, delta)
     local max = math.max(0, content:GetHeight() - s:GetHeight())
     s:SetVerticalScroll(math.min(max, math.max(0, s:GetVerticalScroll() - delta * ROW_H * 2)))
   end)
+  scroll:SetScript("OnSizeChanged", function(s, w) content:SetWidth(w) end)
   local empty = text(live, 12, COL.dim); empty:SetPoint("CENTER", scroll, "CENTER")
+
+  -- column x positions for the current width; the item column takes what's left
+  local colX = {}
+  local function layoutCols(width)
+    local fixed = 0
+    for i = 2, #DEAL_COLS do fixed = fixed + DEAL_COLS[i].width end
+    local itemW = math.max(150, width - PAD * 2 - BTN_W - fixed)
+    local x = PAD
+    for i, col in ipairs(DEAL_COLS) do
+      local w = i == 1 and itemW or col.width
+      colX[i] = { x = x, w = w }
+      x = x + w
+    end
+    for i, h in ipairs(headers) do
+      h:ClearAllPoints()
+      h:SetPoint("LEFT", colX[i].x + (i == 1 and ICON or 0), 0); h:SetWidth(colX[i].w - 6 - (i == 1 and ICON or 0))
+    end
+  end
 
   -- progress strip at the bottom of the card
   local prog = CreateFrame("Frame", nil, live)
-  prog:SetPoint("BOTTOMLEFT", 14, 10); prog:SetPoint("BOTTOMRIGHT", -14, 10); prog:SetHeight(46)
+  prog:SetPoint("BOTTOMLEFT", PAD, 10); prog:SetPoint("BOTTOMRIGHT", -PAD, 10); prog:SetHeight(46)
   prog.icon = prog:CreateTexture(nil, "ARTWORK"); prog.icon:SetSize(20, 20); prog.icon:SetPoint("TOPLEFT", 0, 0)
   prog.name = text(prog, 12, COL.text); prog.name:SetPoint("LEFT", prog.icon, "RIGHT", 8, 0)
   prog.count = text(prog, 11, COL.muted); prog.count:SetPoint("TOPRIGHT", 0, -4)
@@ -352,40 +437,49 @@ local function buildSniperPage(parent, mode)
   prog.left = text(prog, 10, COL.muted); prog.left:SetPoint("BOTTOMLEFT", 0, 0)
   prog.right = text(prog, 10, COL.muted); prog.right:SetPoint("BOTTOMRIGHT", 0, 0)
 
+  -- rows (pooled); click a row to expand it
   local rows = {}
+  local EXPAND_H = 50
   local function row(i)
     if rows[i] then return rows[i] end
     local r = CreateFrame("Button", nil, content)
-    r:SetSize(W - SIDE - 42, ROW_H); r:SetPoint("TOPLEFT", 0, -(i - 1) * ROW_H)
-    r.hl = r:CreateTexture(nil, "BACKGROUND"); r.hl:SetAllPoints(); r.hl:SetColorTexture(1, 1, 1, 0.035); r.hl:Hide()
-    r.icon = r:CreateTexture(nil, "ARTWORK"); r.icon:SetSize(22, 22); r.icon:SetPoint("LEFT", 13, 0)
+    r:SetHeight(ROW_H)
+    r.hl = r:CreateTexture(nil, "BACKGROUND"); r.hl:SetColorTexture(1, 1, 1, 0.035); r.hl:Hide()
+    r.hl:SetPoint("TOPLEFT"); r.hl:SetPoint("TOPRIGHT"); r.hl:SetHeight(ROW_H)
+    r.flash = r:CreateTexture(nil, "BACKGROUND", nil, 1); r.flash:SetColorTexture(unpack(COL.gold))
+    r.flash:SetPoint("TOPLEFT"); r.flash:SetPoint("TOPRIGHT"); r.flash:SetHeight(ROW_H); r.flash:SetAlpha(0)
+    r.anim = r.flash:CreateAnimationGroup()
+    local a1 = r.anim:CreateAnimation("Alpha"); a1:SetFromAlpha(0); a1:SetToAlpha(0.35); a1:SetDuration(0.15); a1:SetOrder(1)
+    local a2 = r.anim:CreateAnimation("Alpha"); a2:SetFromAlpha(0.35); a2:SetToAlpha(0); a2:SetDuration(2.5); a2:SetOrder(2)
+    r.icon = r:CreateTexture(nil, "ARTWORK"); r.icon:SetSize(22, 22)
     r.cells = {}
-    local cx = 14
-    for c, col in ipairs(LIST_COLS) do
-      local fs = text(r, 12, c == 6 and COL.green or COL.text)
-      fs:SetWidth(col[2] - 6 - (c == 1 and 30 or 0)); fs:SetJustifyH(col[3] or "RIGHT")
-      fs:SetPoint("LEFT", cx + (c == 1 and 30 or 0), 0)
+    for c = 1, #DEAL_COLS do
+      local fs = text(r, 12, DEAL_COLS[c].key == "profit" and COL.green or COL.text, nil, DEAL_COLS[c].key == "profit")
+      fs:SetJustifyH(DEAL_COLS[c].align or "RIGHT")
       r.cells[c] = fs
-      cx = cx + col[2]
     end
-    r.buy = flatButton(r, "Buy", 86, 22, "primary", function()
+    -- gap bar inside the Gap cell
+    r.gapTrack = r:CreateTexture(nil, "ARTWORK"); r.gapTrack:SetColorTexture(unpack(COL.line)); r.gapTrack:SetHeight(4)
+    r.gapBar = r:CreateTexture(nil, "OVERLAY"); r.gapBar:SetColorTexture(unpack(COL.gold)); r.gapBar:SetHeight(4)
+    -- expanded details
+    r.detail = text(r, 11, COL.muted, nil, false); r.detail:SetJustifyH("LEFT")
+    r.detail2 = text(r, 11, COL.muted, nil, false); r.detail2:SetJustifyH("LEFT")
+    r.buy = flatButton(r, "Buy", 90, 22, "primary", function()
       local d = r.deal
       if not d or d.state == "bought" or d.state == "buying" or d.state == "failed" then return end
       if d.isCommodity then buyCommodity(d) else buyItems(d) end
       UI.Refresh()
     end)
-    r.buy:SetPoint("RIGHT", -12, 0)
+    r:SetScript("OnClick", function(s) if s.deal then s.deal.expanded = not s.deal.expanded; page:Refresh() end end)
     r:SetScript("OnEnter", function(s)
       s.hl:Show()
       local d = s.deal; if not d then return end
       GameTooltip:SetOwner(s, "ANCHOR_RIGHT")
       GameTooltip:SetItemByID(d.itemID)
       GameTooltip:AddLine(" ")
-      if d.mode == "commodity" then
-        GameTooltip:AddDoubleLine("Price gap after the cheap group", d.gap == math.huge and "nothing above" or string.format("%d%%", d.gap * 100 + 0.5), 1, 1, 1, 1, 1, 1)
-      end
-      GameTooltip:AddDoubleLine("Value (" .. (FF.SourceNames[FF.db.sniper.priceSource] or "") .. ")", money(d.value), 1, 1, 1)
+      GameTooltip:AddDoubleLine("Value (" .. (FF.SourceNames[FF.db.sniper.priceSource] or "") .. ")", FF.Money(d.value), 1, 1, 1)
       GameTooltip:AddDoubleLine("AH cut used", string.format("%d%%", d.cut * 100), 1, 1, 1, 1, 1, 1)
+      GameTooltip:AddLine("Click the row to see the listings you'd buy.", 0.56, 0.56, 0.6)
       GameTooltip:Show()
     end)
     r:SetScript("OnLeave", function(s) s.hl:Hide(); GameTooltip:Hide() end)
@@ -393,42 +487,110 @@ local function buildSniperPage(parent, mode)
     return r
   end
 
+  local function fill(r, d, width)
+    r.deal = d
+    r.icon:ClearAllPoints(); r.icon:SetPoint("TOPLEFT", PAD - 1, -4)
+    r.icon:SetTexture(C_Item.GetItemIconByID(d.itemID))
+    local s = d.stats or {}
+    local values = {
+      FF.QualityColor(d.quality) .. (d.name or "?") .. "|r",
+      tostring(d.buy), FF.Money(d.top), FF.Money(d.cost), FF.Money(d.sell), FF.Money(d.profit),
+      string.format("%d%%", d.roi * 100 + 0.5), fmtNum(s.soldPerDay),
+      s.saleRate and string.format("%d%%", s.saleRate * 100 + 0.5) or "-",
+      daysOf(d) and (daysOf(d) < 1 and "<1" or fmtNum(daysOf(d), daysOf(d) < 10)) or "-",
+      d.gap == math.huge and "open" or string.format("%d%%", d.gap * 100 + 0.5),
+    }
+    for c, fs in ipairs(r.cells) do
+      local cx = colX[c]
+      fs:ClearAllPoints()
+      local off = c == 1 and ICON or 0
+      fs:SetPoint("TOPLEFT", cx.x + off, 0); fs:SetSize(cx.w - 6 - off, ROW_H)
+      fs:SetText(values[c])
+    end
+    -- the Gap cell: a small bar under the number (full at 100 %+)
+    local g = colX[#DEAL_COLS]
+    local frac = d.gap == math.huge and 1 or math.min(1, math.max(0, d.gap))
+    r.gapTrack:ClearAllPoints(); r.gapTrack:SetPoint("TOPLEFT", g.x + 8, -ROW_H + 7); r.gapTrack:SetWidth(g.w - 14)
+    r.gapBar:ClearAllPoints(); r.gapBar:SetPoint("TOPLEFT", r.gapTrack, "TOPLEFT"); r.gapBar:SetWidth(math.max(1, (g.w - 14) * frac))
+    r.cells[#DEAL_COLS]:SetPoint("TOPLEFT", g.x, 3)
+    local label, style = buyLabel(d)
+    r.buy:SetLabel(label); r.buy:SetStyle(style)
+    r.buy:ClearAllPoints(); r.buy:SetPoint("TOPRIGHT", -12, -4)
+    -- expanded: the listings you'd buy, and what comes after them
+    r.detail:SetShown(d.expanded); r.detail2:SetShown(d.expanded)
+    if d.expanded then
+      r.detail:ClearAllPoints(); r.detail:SetPoint("TOPLEFT", PAD + ICON, -ROW_H); r.detail:SetWidth(width - PAD * 2 - ICON)
+      r.detail2:ClearAllPoints(); r.detail2:SetPoint("TOPLEFT", r.detail, "BOTTOMLEFT", 0, -4); r.detail2:SetWidth(width - PAD * 2 - ICON)
+      r.detail:SetText("|cfff2b81dYou buy:|r  " .. listRow(d.rows))
+      r.detail2:SetText("|cff8e8e99Then:|r  " .. listRow(d.after) .. (d.mode == "commodity" and "   |cff8e8e99(resell just under the next price)|r" or ""))
+    end
+    r:SetHeight(d.expanded and ROW_H + EXPAND_H - 8 or ROW_H)
+  end
+
+  local function sorted()
+    local list = {}
+    for _, d in ipairs(FF.Sniper.deals[mode] or {}) do
+      if filterText == "" or (d.name or ""):lower():find(filterText, 1, true) then table.insert(list, d) end
+    end
+    local col
+    for _, c in ipairs(DEAL_COLS) do if c.key == sortState.key then col = c end end
+    col = col or DEAL_COLS[6]
+    table.sort(list, function(a, b)
+      local x, y = col.sort(a), col.sort(b)
+      if x == nil and y == nil then return (a.profit or 0) > (b.profit or 0) end
+      if x == nil then return false end
+      if y == nil then return true end
+      if x == y then return (a.profit or 0) > (b.profit or 0) end
+      if sortState.asc then return x < y end
+      return x > y
+    end)
+    return list
+  end
+
   function page:Refresh()
+    if page:GetWidth() < 10 then return end
+    layoutCards()
+    local width = scroll:GetWidth()
+    layoutCols(width)
+    -- headers with the sort arrow
+    for _, h in ipairs(headers) do
+      local on = h.col.key == sortState.key
+      h.t:SetText(h.col.label:upper() .. (on and (sortState.asc and " ^" or " v") or ""))
+      h.t:SetTextColor(unpack(on and COL.gold or COL.muted))
+    end
     -- scanner card
     local p = FF.Sniper.progress[mode] or {}
     local running = FF.Sniper.running and FF.Sniper.mode == mode
     local st = running and (p.state == "Waiting" and "Waiting" or "Scanning") or (p.state == "Done" and "Done" or "Idle")
     state:Set(st, running and COL.green or COL.muted)
     go:SetLabel(running and "Stop scan" or "Start scan")
-    scope:Refresh(); fast:Refresh(); keep:Refresh()
-    -- stat cards
+    scope:Refresh(); fast:Refresh(); keep:Refresh(); alerts:Refresh()
     for _, c in ipairs(stats) do c.v:SetText(c.def[2]()); c.s:SetText(c.def[3]()) end
     -- deals
-    local deals = FF.Sniper.deals[mode] or {}
-    for i, d in ipairs(deals) do
+    local list = sorted()
+    local total = #(FF.Sniper.deals[mode] or {})
+    count:SetText(total > 0 and (#list < total and string.format("%d of %d", #list, total) or tostring(total)) or "")
+    local y = 0
+    for i, d in ipairs(list) do
       local r = row(i)
-      r.deal = d
-      r.icon:SetTexture(C_Item.GetItemIconByID(d.itemID))
-      local s = d.stats or {}
-      r.cells[1]:SetText(FF.QualityColor(d.quality) .. (d.name or "?") .. "|r")
-      r.cells[2]:SetText(tostring(d.buy))
-      r.cells[3]:SetText(money(d.top))
-      r.cells[4]:SetText(money(d.cost))
-      r.cells[5]:SetText(money(d.sell))
-      r.cells[6]:SetText(money(d.profit))
-      r.cells[7]:SetText(string.format("%d%%", d.roi * 100 + 0.5))
-      r.cells[8]:SetText(s.soldPerDay and string.format("%.0f", s.soldPerDay) or "-")
-      local label, style = buyLabel(d)
-      r.buy:SetLabel(label); r.buy:SetStyle(style)
+      r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y); r:SetPoint("RIGHT", content, "RIGHT")
+      fill(r, d, width)
       r:Show()
+      -- flash rows that just appeared
+      if d.newAt and not d.flashed and FF.db.alerts.flash and GetTime() - d.newAt < 3 then
+        d.flashed = true
+        r.anim:Stop(); r.anim:Play()
+      end
+      y = y + r:GetHeight()
     end
-    for i = #deals + 1, #rows do rows[i]:Hide(); rows[i].deal = nil end
-    content:SetHeight(math.max(1, #deals * ROW_H))
-    empty:SetShown(#deals == 0)
-    empty:SetText(running and "No deals yet. Checking the auction house…"
+    for i = #list + 1, #rows do rows[i]:Hide(); rows[i].deal = nil end
+    content:SetHeight(math.max(1, y))
+    empty:SetShown(#list == 0)
+    empty:SetText(total > 0 and "No deals match the filter."
+      or running and "No deals yet. Checking the auction house…"
       or (AuctionHouseFrame and AuctionHouseFrame:IsShown() and "Pick a scan scope and press Start scan." or "Open the auction house to scan."))
     -- progress strip
-    local total, done = p.total or 0, p.done or 0
+    local ptotal, done = p.total or 0, p.done or 0
     prog:SetShown(running or st == "Done")
     if p.current then
       prog.icon:SetTexture(C_Item.GetItemIconByID(p.current.key.itemID)); prog.icon:Show()
@@ -437,12 +599,13 @@ local function buildSniperPage(parent, mode)
       prog.icon:Hide()
       prog.name:SetText(p.state == "Browsing" and ("Browsing " .. (p.group or "") .. "…") or (p.note or ""))
     end
-    prog.count:SetText(total > 0 and string.format("%d / %d", done, total) or "")
+    prog.count:SetText(ptotal > 0 and string.format("%d / %d", done, ptotal) or "")
     local w = prog.track:GetWidth()
-    prog.bar:SetWidth(math.max(0.01, (total > 0 and done / total or 0) * (w > 0 and w or 1)))
+    prog.bar:SetWidth(math.max(0.01, (ptotal > 0 and done / ptotal or 0) * (w > 0 and w or 1)))
     prog.left:SetText(string.format("%d checked · %d with listings · %d deals", done, p.listed or 0, p.deals or 0))
     prog.right:SetText(p.group and string.format("%s · %s items · %d%% of %s", p.group, p.items or "?", p.pct or cfg().maxPct, p.source or "value") or "")
   end
+  page:SetScript("OnSizeChanged", function() page:Refresh() end)
   return page
 end
 
@@ -557,7 +720,21 @@ end
 
 local function build()
   frame = box(UIParent, COL.bg, COL.line2)
-  frame:SetSize(W, H)
+  local size = FF.db.size or {}
+  frame:SetSize(math.max(MIN_W, size.w or W), math.max(MIN_H, size.h or H))
+  frame:SetResizable(true)
+  if frame.SetResizeBounds then frame:SetResizeBounds(MIN_W, MIN_H, 1900, 1200) elseif frame.SetMinResize then frame:SetMinResize(MIN_W, MIN_H) end
+  local grip = CreateFrame("Button", nil, frame)
+  grip:SetSize(16, 16); grip:SetPoint("BOTTOMRIGHT", -2, 2); grip:SetFrameLevel(frame:GetFrameLevel() + 50)
+  grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+  grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+  grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+  grip:SetScript("OnMouseDown", function() frame:StartSizing("BOTTOMRIGHT") end)
+  grip:SetScript("OnMouseUp", function()
+    frame:StopMovingOrSizing()
+    FF.db.size = { w = math.floor(frame:GetWidth()), h = math.floor(frame:GetHeight()) }
+    if UI.IsDocked() then UI.Dock() end   -- keep it in place over the auction house
+  end)
   frame:SetPoint("CENTER")
   frame:SetFrameStrata("HIGH")
   frame:SetMovable(true); frame:EnableMouse(true); frame:SetClampedToScreen(true)
@@ -640,7 +817,7 @@ end
 
 -- building blocks for pages in other files
 FF.Kit = {
-  COL = COL, box = box, text = text, flatButton = flatButton, pill = pill, checkbox = checkbox,
+  COL = COL, box = box, text = text, setFont = setFont, flatButton = flatButton, pill = pill, checkbox = checkbox,
   dropdown = dropdown, numberField = numberField, W = W, SIDE = SIDE, ROW_H = ROW_H,
   status = function(msg) status(msg) end,
 }
@@ -664,6 +841,7 @@ end
 -- window stays open but invisible underneath (closing it would close the auction house). Only the
 -- look changes; buying, posting and cancelling still go through the player's own clicks.
 local docked = false
+function UI.IsDocked() return docked end
 local function ahOpen() return AuctionHouseFrame and AuctionHouseFrame:IsShown() end
 
 function UI.Dock()
@@ -720,6 +898,14 @@ end
 
 -- ---------- events ----------
 FF:On("FF_DEALS_CHANGED", function() UI.Refresh() end)
+local lastAlert = 0
+FF:On("FF_NEW_DEAL", function()
+  if not FF.db.alerts.sound or GetTime() - lastAlert < 3 then return end
+  lastAlert = GetTime()
+  local kit = SOUNDKIT and (SOUNDKIT.AUCTION_WINDOW_OPEN or SOUNDKIT.IG_QUEST_LIST_OPEN)
+  if kit then pcall(PlaySound, kit, "Master") end
+  if FlashClientIcon then pcall(FlashClientIcon) end
+end)
 FF:On("FF_SNIPER_PROGRESS", function() UI.Refresh() end)
 FF:On("FF_SESSION_CHANGED", function() UI.Refresh() end)
 FF:On("PLAYER_MONEY", function() UI.Header() end)

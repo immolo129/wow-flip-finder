@@ -189,6 +189,11 @@ sales data (keep TSM and its desktop app running), so it needs no other setup.
   line for your running profit; 7 days / 30 days / all time, optionally only items you flipped. Purchases are
   recorded when you buy through Flip Finder; sales are read from Blizzard's "Auction successful" mails when
   you open your mailbox (read only: the addon never takes mail or money).
+- **Deals list:** click a column header to sort (again to reverse), type in *Filter items* to narrow it down, and
+  click a row to see the exact listings you'd buy and what comes after them. Columns include sell chance, days to
+  resell at the current pace, and the price gap (with a small bar). *Alerts* plays a sound and flashes new deals
+  (and the taskbar icon when WoW is in the background).
+- **Window:** drag the bottom-right corner to resize; the size is remembered.
 - **Keep scanning** keeps deals on the list between rounds; a deal only disappears when it's gone or no longer cheap.
 - `/ff tooltip` turns the tooltip lines on/off, `/ff debug` + shift-click an item shows TSM's raw values,
   `/ff log` shows recent activity.

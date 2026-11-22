@@ -214,7 +214,8 @@ FF.UI.RegisterPage("post", function(parent)
   end
   local scroll = CreateFrame("ScrollFrame", nil, list)
   scroll:SetPoint("TOPLEFT", 1, -30); scroll:SetPoint("BOTTOMRIGHT", -1, 4)
-  local content = CreateFrame("Frame", nil, scroll); content:SetSize(K.W - K.SIDE - 42, 1)
+  local content = CreateFrame("Frame", nil, scroll); content:SetSize(1, 1)
+  scroll:SetScript("OnSizeChanged", function(s, w) content:SetWidth(w) end)
   scroll:SetScrollChild(content); scroll:EnableMouseWheel(true)
   scroll:SetScript("OnMouseWheel", function(s, delta)
     local max = math.max(0, content:GetHeight() - s:GetHeight())
@@ -225,7 +226,7 @@ FF.UI.RegisterPage("post", function(parent)
   local function row(i)
     if rows[i] then return rows[i] end
     local r = CreateFrame("Button", nil, content)
-    r:SetSize(K.W - K.SIDE - 42, K.ROW_H); r:SetPoint("TOPLEFT", 0, -(i - 1) * K.ROW_H)
+    r:SetHeight(K.ROW_H); r:SetPoint("TOPLEFT", 0, -(i - 1) * K.ROW_H); r:SetPoint("RIGHT", content, "RIGHT")
     r.icon = r:CreateTexture(nil, "ARTWORK"); r.icon:SetSize(22, 22); r.icon:SetPoint("LEFT", 13, 0)
     r.cells = {}
     local cx = 14
