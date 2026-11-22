@@ -40,6 +40,14 @@ function Sniper.Cut()
   return 0.05
 end
 
+-- the listings a deal buys (rows 1..last) and the next few after them, for the expanded row
+local function ladderParts(ladder, last)
+  local bought, after = {}, {}
+  for j = 1, last do table.insert(bought, { price = ladder[j].price, qty = ladder[j].qty }) end
+  for j = last + 1, math.min(#ladder, last + 3) do table.insert(after, { price = ladder[j].price, qty = ladder[j].qty }) end
+  return bought, after
+end
+
 -- The deal rules. ladder: { {price=, qty=, [auctionID=, buyout=]}, ... } cheapest first.
 -- Returns a deal table or nil (and a reason, for the log).
 function Sniper.Evaluate(itemID, ladder, value, cfg, cut)
@@ -85,14 +93,6 @@ function Sniper.Evaluate(itemID, ladder, value, cfg, cut)
     itemID = itemID, buy = buy, cost = cost, top = top, sell = sell, profit = profit, roi = roi,
     gap = gap, value = value, auctions = auctions, cut = cut, rows = rows, after = after,
   }
-end
-
--- the listings a deal buys (rows 1..last) and the next few after them, for the expanded row
-local function ladderParts(ladder, last)
-  local bought, after = {}, {}
-  for j = 1, last do table.insert(bought, { price = ladder[j].price, qty = ladder[j].qty }) end
-  for j = last + 1, math.min(#ladder, last + 3) do table.insert(after, { price = ladder[j].price, qty = ladder[j].qty }) end
-  return bought, after
 end
 
 local function itemInfo(itemKey)
@@ -328,7 +328,11 @@ function Sniper.Candidates(mode, results, myRun)
       p.current = c
       if ladder and ladder[1] then p.listed = p.listed + 1 end
       local evaluate = mode == "commodity" and Sniper.Evaluate or mode == "vendor" and Sniper.EvaluateVendor or Sniper.EvaluateItems
-      local deal, why = evaluate(c.key.itemID, ladder, c.value, cfg, cut)
+      local ok, deal, why = pcall(evaluate, c.key.itemID, ladder, c.value, cfg, cut)
+      if not ok then
+        FF.Log("error checking " .. tostring(c.info.name) .. ": " .. tostring(deal))
+        deal, why = nil, "error (see log)"
+      end
       if deal then
         deal.itemKey, deal.name, deal.quality, deal.link = c.key, c.info.name, c.info.quality, c.info.link
         deal.isCommodity, deal.stats, deal.mode = c.commodity, FF.Stats(c.key.itemID), mode
