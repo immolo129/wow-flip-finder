@@ -1,7 +1,7 @@
--- Flip Finder: the investment scanner.
+-- Gold Forge: the investment scanner.
 -- Finds items trading well below their normal price that should sell higher later, for example
 -- before a raid opens. "Normal" is TSM's 60-day historical price on this auction house (falls back
--- to the region average). Flip Finder's own 7-day price history adds a short-term trend.
+-- to the region average). Gold Forge's own 7-day price history adds a short-term trend.
 -- It only reads the auction house; every purchase is one click to start and one click to confirm.
 local _, FF = ...
 local Invest = { rows = {}, state = "Idle", done = 0, total = 0 }

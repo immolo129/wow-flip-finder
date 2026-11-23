@@ -1,4 +1,4 @@
--- Flip Finder: talks to the auction house. One query at a time, waiting for Blizzard's throttle.
+-- Gold Forge: talks to the auction house. One query at a time, waiting for Blizzard's throttle.
 -- Searching is allowed without clicks (like TSM and Auctionator do); buying is not done here.
 local _, FF = ...
 local Scan = {}

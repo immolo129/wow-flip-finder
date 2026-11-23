@@ -1,4 +1,4 @@
--- Flip Finder: your own lists ("My herbs", "Recipes that sell"). Any sniper can scan a list instead of a
+-- Gold Forge: your own lists ("My herbs", "Recipes that sell"). Any sniper can scan a list instead of a
 -- whole category: only those items are checked, so the scan is fast and has no noise.
 local _, FF = ...
 local Lists = {}

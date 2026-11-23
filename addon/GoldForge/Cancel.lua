@@ -1,4 +1,4 @@
--- Flip Finder: the cancel scan. Checks each of your auctions against the competition and lists the
+-- Gold Forge: the cancel scan. Checks each of your auctions against the competition and lists the
 -- ones you've been undercut on. Cancelling is ONE CLICK PER AUCTION (Blizzard requires a click);
 -- cancelled items go to your mailbox, ready to post again.
 local _, FF = ...

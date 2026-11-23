@@ -65,7 +65,7 @@ There are no tests. To check a change, run demo mode, which needs no API keys an
 - Use plain functions, short docstrings, and comments that explain *why*.
 - Match the existing code style. Don't add type hints, classes or frameworks the code doesn't already use.
 
-## In-game addon (`addon/FlipFinder`)
+## In-game addon: Gold Forge (`addon/GoldForge`, renamed from Flip Finder in 0.8.1)
 **Blizzard's rules come first, always.** The owner wants the addon and the website within Blizzard's Terms of Use, addon policy and API terms at all times. Before adding anything, check it against these:
 - Every purchase, post, cancel or other action that spends or moves gold or items must come from the player's own click (an `OnClick` handler), one action per click. Never chain them, never trigger them from timers, events or loops, never auto-confirm.
 - The one exception to one-action-per-click is the mailbox helper (`Mail.lua`): one click collects auction mail in sequence, exactly like Blizzard's own "Open All" button and the Postal addon. It only takes gold/items from the player's own auction mail, never COD mail, and never buys, posts or cancels.
@@ -77,5 +77,5 @@ There are no tests. To check a change, run demo mode, which needs no API keys an
 - Lua for the WoW: Forever client (Interface 16001, client 1.60). Forever uses the **modern auction house API** (`C_AuctionHouse`, commodities vs items), like retail; Auctionator's `Source_ModernAH` with its `IsForever` branches is a good reference for quirks (copper prices allowed, 2/8/24 h durations, one AH per ruleset and faction).
 - Prices come from TradeSkillMaster's public API (`TSM_API.GetCustomPriceValue("DBMarket", "i:<id>")` etc.), see `Prices.lua`. TSM's desktop app keeps that data fresh.
 - Buying, posting and cancelling need a hardware click (protected API). Never automate them; scanning (search queries) is fine.
-- WoW is installed at `C:\Program Files (x86)\World of Warcraft\_forever_`. After the user plays, errors are in `WTF/Account/*/SavedVariables/BugSack.lua` and the addon's log in `.../SavedVariables/FlipFinder.lua` (written on logout or /reload).
+- WoW is installed at `C:\Program Files (x86)\World of Warcraft\_forever_`. After the user plays, errors are in `WTF/Account/*/SavedVariables/BugSack.lua` and the addon's log in `.../SavedVariables/GoldForge.lua` (written on logout or /reload).
 - Install with `install-addon.bat` (copies to the AddOns folder). No Lua runtime here; `luaparser` (pip) does syntax checks.

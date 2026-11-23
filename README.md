@@ -162,14 +162,14 @@ In `.env` (PC) or as repository variables (GitHub):
 | `app.py` | Local web server with hourly fetch |
 | `config.py`, `storage.py`, `demo.py` | Settings, database, demo data |
 
-## In-game addon: Flip Finder
+## In-game addon: Gold Forge
 
-A private flipping addon for WoW: Forever, in `addon/FlipFinder`. It uses **TradeSkillMaster's** price and
+A private flipping addon for WoW: Forever, in `addon/GoldForge`. It uses **TradeSkillMaster's** price and
 sales data (keep TSM and its desktop app running), so it needs no other setup.
 
 - **Install / update:** double-click `install-addon.bat`, then `/reload` in game.
 - **Tooltips:** realm value, lowest buyout, region value, region sold value, daily sold and sell chance.
-- **Sniper** (opens next to the auction house, or `/ff`): pick a group (reagents & materials, consumables,
+- **Sniper** (opens next to the auction house, or `/gf`): pick a group (reagents & materials, consumables,
   recipes, gear, …) and press **Scan**. It finds listings below *Max % of value* that pass the sales filter
   (daily sold or sell chance), then checks each one's full price list for a **resell gap**: the cheap listings
   must be followed by a price jump of at least *Resell gap %*, or there's nothing to resell into.
@@ -181,13 +181,13 @@ sales data (keep TSM and its desktop app running), so it needs no other setup.
 - **Post:** *Scan bags* prices everything worth selling against the competition: undercut the cheapest by
   your undercut amount, never below *Min % of value* or a vendor's price, never above *Max % of value*, and at
   *Normal %* when nobody else sells it. Then **Post next** posts one item per click (Blizzard requires a click
-  per post). *Only items I flipped* limits it to things you bought with Flip Finder.
+  per post). *Only items I flipped* limits it to things you bought with Gold Forge.
 - **Cancel scan:** *Scan my auctions* checks each of your auctions against the competition and lists the
   undercut ones (or says to keep it up if the competitor is below your minimum). **Cancel next** cancels one
   per click; the items go to your mailbox, ready to post again.
 - **Earnings:** what you've spent on flips and earned from sales, per day (green and red bars) with a gold
   line for your running profit; 7 days / 30 days / all time, optionally only items you flipped. Purchases are
-  recorded when you buy through Flip Finder; sales are read from Blizzard's "Auction successful" mails when
+  recorded when you buy through Gold Forge; sales are read from Blizzard's "Auction successful" mails when
   you open your mailbox (read only: the addon never takes mail or money).
 - **Vendor Sniper:** listings priced below what a vendor pays (by at least *Min margin %*). Buy them and sell to any
   vendor: guaranteed profit, no reselling. Uses the game's own vendor prices, so it works without TSM.
@@ -196,7 +196,7 @@ sales data (keep TSM and its desktop app running), so it needs no other setup.
 - **Lists:** your own groups of items ("My herbs", "Recipes that sell"). Add items by clicking the box and
   shift-clicking items, dragging them onto it, or typing an item ID. Every sniper's *Scan scope* offers your lists:
   only those items are checked, so the scan is fast and has no noise.
-- **Crafting:** open each profession window once and Flip Finder reads your learned recipes (per character). The
+- **Crafting:** open each profession window once and Gold Forge reads your learned recipes (per character). The
   Crafting page shows reagent cost (TSM market value or lowest buyout, or a vendor's price when cheaper), what the
   result sells for after the AH cut, profit, ROI, daily sold and sell chance. *Reagents to list* puts a recipe's
   reagents on the "Crafting reagents" list so you can snipe them cheaply.
@@ -207,17 +207,17 @@ sales data (keep TSM and its desktop app running), so it needs no other setup.
   and *Keep checking* (every minute while the auction house is open, stops after 30 minutes) look up just your
   alert items. An alert shows on screen, plays a sound, prints in chat and flashes the taskbar icon (at most once
   every 10 minutes per item). Alerts only notify; nothing is bought by itself.
-- **Price history:** right-click a deal or crafting row, click an item on a list or alert, or `/ff item` + item:
+- **Price history:** right-click a deal or crafting row, click an item on a list or alert, or `/gf item` + item:
   a window with the item's numbers and a chart of the lowest price seen and TSM's market value (24 h / 3 / 7 days).
-  TSM doesn't share its history with other addons, so Flip Finder records its own from your scans, for items on
+  TSM doesn't share its history with other addons, so Gold Forge records its own from your scans, for items on
   your lists, alerts, deals and recipes: it fills in as you scan, kept for 7 days.
-- **Minimap button:** left-click opens or closes Flip Finder, right-click opens Price alerts, drag to move it.
-  `/ff minimap` hides or shows it.
+- **Minimap button:** left-click opens or closes Gold Forge, right-click opens Price alerts, drag to move it.
+  `/gf minimap` hides or shows it.
 - **Deals list:** click a column header to sort (again to reverse), type in *Filter items* to narrow it down, and
   click a row to see the exact listings you'd buy and what comes after them. Columns include sell chance, days to
   resell at the current pace, and the price gap (with a small bar). *Alerts* plays a sound and flashes new deals
   (and the taskbar icon when WoW is in the background).
 - **Window:** drag the bottom-right corner to resize; the size is remembered.
 - **Keep scanning** keeps deals on the list between rounds; a deal only disappears when it's gone or no longer cheap.
-- `/ff tooltip` turns the tooltip lines on/off, `/ff debug` + shift-click an item shows TSM's raw values,
-  `/ff log` shows recent activity.
+- `/gf tooltip` turns the tooltip lines on/off, `/gf debug` + shift-click an item shows TSM's raw values,
+  `/gf log` shows recent activity.

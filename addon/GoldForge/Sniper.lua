@@ -1,4 +1,4 @@
--- Flip Finder: the sniper. Finds deals like the commodity sniper in the video:
+-- Gold Forge: the sniper. Finds deals like the commodity sniper in the video:
 --   1. a quick browse of a group (every item's lowest price) picks out candidates below X% of the value
 --      that pass the sales filter (daily sold or sell chance),
 --   2. each candidate's full price list is loaded and the "resell gap" rule is applied: the cheap listings

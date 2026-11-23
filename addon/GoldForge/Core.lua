@@ -1,14 +1,14 @@
--- Flip Finder: core. Settings, events, money formatting, logging and slash commands.
+-- Gold Forge: core. Settings, events, money formatting, logging and slash commands.
 local ADDON, FF = ...
-_G.FlipFinder = FF
-FF.version = "0.8.0"
+_G.GoldForge = FF
+FF.version = "0.8.1"
 
 -- Settings. Money is in copper (1g = 10000), percentages are whole numbers.
 local DEFAULTS = {
   tooltip = true,
   showOnAH = true,
   replaceAH = true,
-  alerts = { sound = true, flash = true },   -- new deal: sound, row flash, taskbar flash     -- Flip Finder takes the place of Blizzard's auction house window
+  alerts = { sound = true, flash = true },   -- new deal: sound, row flash, taskbar flash     -- Gold Forge takes the place of Blizzard's auction house window
   sniper = {
     group = "materials",
     priceSource = "realm",  -- realm = DBMarket, region = DBRegionMarketAvg, sale = DBRegionSaleAvg
@@ -61,9 +61,9 @@ local DEFAULTS = {
     undercut = 1,           -- copper below the cheapest competitor
     duration = 3,           -- 1 = 2 h, 2 = 8 h, 3 = 24 h on Forever
     minValue = 1000,        -- don't bother with items worth less than this (10s)
-    onlyFlipped = false,    -- only post items bought with Flip Finder
+    onlyFlipped = false,    -- only post items bought with Gold Forge
   },
-  flipped = {},             -- itemID -> when we bought it with Flip Finder
+  flipped = {},             -- itemID -> when we bought it with Gold Forge
   flippedNames = {},        -- item name -> true (sale mails only carry the name)
   ledger = { buys = {}, sales = {}, seen = {} },   -- purchases and sales for the Earnings page
   lists = {},               -- your own item lists, scannable by any sniper
@@ -113,7 +113,7 @@ eventFrame:SetScript("OnEvent", function(_, event, ...) FF:Fire(event, ...) end)
 
 -- ---------- helpers ----------
 function FF.Print(...)
-  print("|cffe9c25aFlip Finder|r:", ...)
+  print("|cffe9c25aGold Forge|r:", ...)
 end
 
 -- A short log kept in the saved variables, so problems can be looked at after a /reload.
@@ -149,9 +149,9 @@ end
 -- ---------- start-up ----------
 FF:On("ADDON_LOADED", function(name)
   if name ~= ADDON then return end
-  FlipFinderDB = FlipFinderDB or {}
-  merge(FlipFinderDB, DEFAULTS)
-  FF.db = FlipFinderDB
+  GoldForgeDB = GoldForgeDB or {}
+  merge(GoldForgeDB, DEFAULTS)
+  FF.db = GoldForgeDB
   FF.Log("loaded " .. FF.version .. ", TSM " .. (FF.HasTSM() and "found" or "MISSING"))
   FF:Fire("FF_READY")
 end)
@@ -163,9 +163,10 @@ FF:On("PLAYER_LOGIN", function()
 end)
 
 -- ---------- slash commands ----------
-SLASH_FLIPFINDER1 = "/ff"
-SLASH_FLIPFINDER2 = "/flipfinder"
-SlashCmdList.FLIPFINDER = function(msg)
+SLASH_GOLDFORGE1 = "/gf"
+SLASH_GOLDFORGE2 = "/goldforge"
+SLASH_GOLDFORGE3 = "/ff"   -- the old Flip Finder command keeps working
+SlashCmdList.GOLDFORGE = function(msg)
   msg = strtrim(msg or "")
   local cmd, rest = msg:match("^(%S*)%s*(.-)$")
   cmd = (cmd or ""):lower()
@@ -175,23 +176,23 @@ SlashCmdList.FLIPFINDER = function(msg)
     FF.db.tooltip = not FF.db.tooltip
     FF.Print("tooltip lines " .. (FF.db.tooltip and "on" or "off"))
   elseif cmd == "debug" then
-    -- /ff debug [item link]: prints and logs the raw TSM values, to check what TSM returns
+    -- /gf debug [item link]: prints and logs the raw TSM values, to check what TSM returns
     local id = rest and tonumber(rest:match("item:(%d+)") or rest)
-    if not id then FF.Print("usage: /ff debug [shift-click an item]"); return end
+    if not id then FF.Print("usage: /gf debug [shift-click an item]"); return end
     for _, key in ipairs(FF.SourceKeys) do
       local v = FF.Raw(key, id)
       FF.Print(key, tostring(v))
       FF.Log("debug " .. id .. " " .. key .. "=" .. tostring(v))
     end
   elseif cmd == "item" then
-    -- /ff item [item link]: the item window with its price history
+    -- /gf item [item link]: the item window with its price history
     local id = rest and tonumber(rest:match("item:(%d+)") or rest)
-    if id then FF.History.Open(id) else FF.Print("usage: /ff item [shift-click an item]") end
+    if id then FF.History.Open(id) else FF.Print("usage: /gf item [shift-click an item]") end
   elseif cmd == "minimap" then
     FF.MinimapButton.Toggle()
   elseif cmd == "log" then
     for i = math.max(1, #FF.db.log - 15), #FF.db.log do FF.Print(FF.db.log[i]) end
   else
-    FF.Print("/ff  open or close · /ff item [item]  price history · /ff minimap  show/hide the minimap button · /ff tooltip  tooltip lines on/off · /ff debug [item]  raw TSM values · /ff log  recent log")
+    FF.Print("/gf  open or close · /gf item [item]  price history · /gf minimap  show/hide the minimap button · /gf tooltip  tooltip lines on/off · /gf debug [item]  raw TSM values · /gf log  recent log")
   end
 end

@@ -1,4 +1,4 @@
--- Flip Finder: price alerts. "Tell me when Black Lotus is below 30g." Every scan checks the prices it sees
+-- Gold Forge: price alerts. "Tell me when Black Lotus is below 30g." Every scan checks the prices it sees
 -- against your alerts; "Check now" and "Keep checking" look up just your alert items while you're at the
 -- auction house. An alert shows on screen, plays a sound, prints in chat and flashes the taskbar icon,
 -- at most once every 10 minutes per item. Alerts only notify: nothing is ever bought by itself.
@@ -27,7 +27,7 @@ local function notify(itemID, price, w)
   FF.Print("|cff4ade80Alert:|r " .. msg)
   FF.Log("alert: " .. msg)
   if RaidNotice_AddMessage and RaidWarningFrame then
-    RaidNotice_AddMessage(RaidWarningFrame, "Flip Finder: " .. msg, ChatTypeInfo and ChatTypeInfo.RAID_WARNING or { r = 1, g = 0.8, b = 0.1 })
+    RaidNotice_AddMessage(RaidWarningFrame, "Gold Forge: " .. msg, ChatTypeInfo and ChatTypeInfo.RAID_WARNING or { r = 1, g = 0.8, b = 0.1 })
   end
   local kit = SOUNDKIT and (SOUNDKIT.RAID_WARNING or SOUNDKIT.UI_RAID_BOSS_WHISPER_WARNING)
   if kit then pcall(PlaySound, kit, "Master") end

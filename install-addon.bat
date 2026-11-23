@@ -1,5 +1,5 @@
 @echo off
-title Install Flip Finder addon
+title Install Gold Forge addon
 cd /d "%~dp0"
 set "WOW=C:\Program Files (x86)\World of Warcraft\_forever_"
 if not exist "%WOW%\Interface\AddOns" (
@@ -8,6 +8,7 @@ if not exist "%WOW%\Interface\AddOns" (
   pause
   exit /b
 )
-xcopy /E /I /Y "addon\FlipFinder" "%WOW%\Interface\AddOns\FlipFinder" >nul
-echo Flip Finder installed. In game, type /reload (or log in) to load the new version.
+xcopy /E /I /Y "addon\GoldForge" "%WOW%\Interface\AddOns\GoldForge" >nul
+if exist "%WOW%\Interface\AddOns\FlipFinder" rmdir /S /Q "%WOW%\Interface\AddOns\FlipFinder"
+echo Gold Forge installed. In game, type /reload (or log in) to load the new version.
 pause

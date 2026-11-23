@@ -1,10 +1,10 @@
 ## Interface: 16001
-## Title: Flip Finder
+## Title: Gold Forge
 ## Notes: Private flipping helper for WoW: Forever. Finds deals on the auction house using TradeSkillMaster's price and sales data.
 ## Author: immolo129
-## Version: 0.8.0
+## Version: 0.8.1
 ## OptionalDeps: TradeSkillMaster
-## SavedVariables: FlipFinderDB
+## SavedVariables: GoldForgeDB
 ## IconTexture: Interface\Icons\INV_Misc_Coin_02
 
 Core.lua

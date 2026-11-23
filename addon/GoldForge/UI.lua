@@ -1,4 +1,4 @@
--- Flip Finder: the window. Dark panels, a left menu, stat cards and a live list of deals.
+-- Gold Forge: the window. Dark panels, a left menu, stat cards and a live list of deals.
 -- Every purchase is a click (Blizzard requires one for buying): Buy, then Confirm for commodities;
 -- for single auctions the first click refreshes the listing and each click after that buys one.
 local _, FF = ...
@@ -14,8 +14,8 @@ local COL = {
   gold = { 0.95, 0.72, 0.11 }, goldText = { 0.1, 0.07, 0 }, green = { 0.29, 0.87, 0.5 }, red = { 0.97, 0.44, 0.44 },
 }
 -- Inter (SIL Open Font License, see Media/FONTS-LICENSE.txt); the game's font if it can't load
-local FONT = "Interface\\AddOns\\FlipFinder\\Media\\Inter-Regular.ttf"
-local FONT_B = "Interface\\AddOns\\FlipFinder\\Media\\Inter-SemiBold.ttf"
+local FONT = "Interface\\AddOns\\GoldForge\\Media\\Inter-Regular.ttf"
+local FONT_B = "Interface\\AddOns\\GoldForge\\Media\\Inter-SemiBold.ttf"
 local FALLBACK = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
 local W, H, SIDE, HEAD = 1120, 640, 176, 44      -- default size; the window can be resized
 local MIN_W, MIN_H = 1000, 560
@@ -877,8 +877,8 @@ local function build()
   frame:RegisterForDrag("LeftButton")
   frame:SetScript("OnDragStart", frame.StartMoving)
   frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-  _G.FlipFinderFrame = frame
-  table.insert(UISpecialFrames, "FlipFinderFrame")
+  _G.GoldForgeFrame = frame
+  table.insert(UISpecialFrames, "GoldForgeFrame")
 
   -- header
   local head = box(frame, COL.side, COL.line)
@@ -892,7 +892,7 @@ local function build()
   frame.blizz:SetScript("OnEnter", function(s)
     s:SetBackdropBorderColor(unpack(COL.gold))
     GameTooltip:SetOwner(s, "ANCHOR_BOTTOM"); GameTooltip:SetText("Switch to Blizzard's auction house window", 1, 1, 1)
-    GameTooltip:AddLine("The Flip Finder button on it switches back.", nil, nil, nil, true); GameTooltip:Show()
+    GameTooltip:AddLine("The Gold Forge button on it switches back.", nil, nil, nil, true); GameTooltip:Show()
   end)
   frame.blizz:HookScript("OnLeave", GameTooltip_Hide)
   frame.blizz:Hide()
@@ -978,7 +978,7 @@ function UI.Refresh()
 end
 
 -- ---------- one auction house window ----------
--- At the auction house, Flip Finder takes the place of Blizzard's window (like TSM does): Blizzard's
+-- At the auction house, Gold Forge takes the place of Blizzard's window (like TSM does): Blizzard's
 -- window stays open but invisible underneath (closing it would close the auction house). Only the
 -- look changes; buying, posting and cancelling still go through the player's own clicks.
 local docked = false
@@ -1012,7 +1012,7 @@ function UI.Undock()
   end
 end
 
--- outside the auction house (/ff): a normal movable window
+-- outside the auction house (/gf): a normal movable window
 function UI.Show()
   if not frame then build() end
   if ahOpen() and FF.db.replaceAH ~= false then return UI.Dock() end
@@ -1026,11 +1026,11 @@ function UI.Show()
 end
 function UI.Toggle()
   if frame and frame:IsShown() then frame:Hide()
-  elseif ahOpen() then UI.Dock()      -- /ff at the auction house always brings Flip Finder back
+  elseif ahOpen() then UI.Dock()      -- /gf at the auction house always brings Gold Forge back
   else UI.Show() end
 end
 
--- closing Flip Finder while it stands in for the auction house closes the auction house too
+-- closing Gold Forge while it stands in for the auction house closes the auction house too
 function UI.OnHide()
   if docked and not frame.undocking and ahOpen() then
     docked = false
@@ -1055,17 +1055,17 @@ FF:On("PLAYER_MONEY", function() UI.Header() end)
 
 -- Blizzard's auction house window only exists once its code has loaded, and the "auction house opened"
 -- event can come before the window is visible. So we hook the window itself: whenever it appears,
--- Flip Finder takes its place (or, in Blizzard mode, the switch-back button shows).
+-- Gold Forge takes its place (or, in Blizzard mode, the switch-back button shows).
 local hooked = false
 local function hookAuctionHouse()
   if hooked or not AuctionHouseFrame then return end
   hooked = true
-  UI.ahButton = flatButton(AuctionHouseFrame, "Flip Finder", 110, 24, "primary", function() UI.Dock() end)
+  UI.ahButton = flatButton(AuctionHouseFrame, "Gold Forge", 110, 24, "primary", function() UI.Dock() end)
   UI.ahButton:SetPoint("TOPRIGHT", AuctionHouseFrame, "TOPRIGHT", -70, -3)
   UI.ahButton:SetFrameStrata("HIGH")
   UI.ahButton:SetScript("OnEnter", function(s)
     s:SetBackdropBorderColor(1, 1, 1, 1)
-    GameTooltip:SetOwner(s, "ANCHOR_BOTTOM"); GameTooltip:SetText("Switch to Flip Finder", 1, 1, 1); GameTooltip:Show()
+    GameTooltip:SetOwner(s, "ANCHOR_BOTTOM"); GameTooltip:SetText("Switch to Gold Forge", 1, 1, 1); GameTooltip:Show()
   end)
   UI.ahButton:HookScript("OnLeave", GameTooltip_Hide)
   AuctionHouseFrame:HookScript("OnShow", function() C_Timer.After(0, UI.OnAuctionHouseShown) end)

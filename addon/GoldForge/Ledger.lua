@@ -1,5 +1,5 @@
--- Flip Finder: the ledger and the Earnings page.
--- Purchases are recorded when you buy through Flip Finder. Sales are read from the "Auction successful"
+-- Gold Forge: the ledger and the Earnings page.
+-- Purchases are recorded when you buy through Gold Forge. Sales are read from the "Auction successful"
 -- mails Blizzard sends (their invoice says the item, sale price and AH cut), whenever the mailbox is
 -- open. Only reading: the addon never takes mail or money out.
 local _, FF = ...
@@ -131,7 +131,7 @@ FF.UI.RegisterPage("earnings", function(parent)
   page:SetAllPoints()
   local title = text(page, 18, COL.text); title:SetPoint("TOPLEFT", 20, -16); title:SetText("Earnings")
   local sub = text(page, 11, COL.muted); sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -5)
-  sub:SetText("Purchases made with Flip Finder, and auction sales read from your mailbox (open it to update).")
+  sub:SetText("Purchases made with Gold Forge, and auction sales read from your mailbox (open it to update).")
 
   local ranges = { { "7 days", 7 }, { "30 days", 30 }, { "All", false } }
   local rangeBtns = {}

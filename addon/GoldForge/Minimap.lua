@@ -1,5 +1,5 @@
--- Flip Finder: minimap button. Left-click opens or closes Flip Finder, right-click opens Price alerts,
--- drag it around the minimap edge (the spot is remembered). /ff minimap hides or shows it.
+-- Gold Forge: minimap button. Left-click opens or closes Gold Forge, right-click opens Price alerts,
+-- drag it around the minimap edge (the spot is remembered). /gf minimap hides or shows it.
 local _, FF = ...
 local Minimap_ = {}
 FF.MinimapButton = Minimap_
@@ -13,7 +13,7 @@ local function place()
 end
 
 local function build()
-  btn = CreateFrame("Button", "FlipFinderMinimapButton", Minimap)
+  btn = CreateFrame("Button", "GoldForgeMinimapButton", Minimap)
   btn:SetSize(31, 31)
   btn:SetFrameStrata("MEDIUM")
   btn:SetFrameLevel(8)
@@ -50,7 +50,7 @@ local function build()
   btn:SetScript("OnDragStop", function(s) s:SetScript("OnUpdate", nil) end)
   btn:SetScript("OnEnter", function(s)
     GameTooltip:SetOwner(s, "ANCHOR_LEFT")
-    GameTooltip:SetText("Flip Finder", 0.95, 0.72, 0.11)
+    GameTooltip:SetText("Gold Forge", 0.95, 0.72, 0.11)
     GameTooltip:AddLine("Left-click: open or close", 1, 1, 1)
     GameTooltip:AddLine("Right-click: price alerts", 1, 1, 1)
     GameTooltip:AddLine("Drag: move this button", 0.56, 0.56, 0.6)
@@ -72,7 +72,7 @@ end
 function Minimap_.Toggle()
   FF.db.minimap.hide = not FF.db.minimap.hide
   Minimap_.Refresh()
-  FF.Print("minimap button " .. (FF.db.minimap.hide and "hidden (/ff minimap to show it)" or "shown"))
+  FF.Print("minimap button " .. (FF.db.minimap.hide and "hidden (/gf minimap to show it)" or "shown"))
 end
 
 FF:On("PLAYER_LOGIN", function() Minimap_.Refresh() end)

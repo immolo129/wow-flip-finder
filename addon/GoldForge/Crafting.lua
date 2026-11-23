@@ -1,4 +1,4 @@
--- Flip Finder: crafting profit for the recipes you know. Open a profession window once and the learned
+-- Gold Forge: crafting profit for the recipes you know. Open a profession window once and the learned
 -- recipes are saved (per character). Prices come from TSM; a reagent a vendor sells cheaper is priced
 -- at the vendor. Nothing is crafted or bought here: it only calculates.
 local _, FF = ...
@@ -134,7 +134,7 @@ FF.UI.RegisterPage("crafting", function(parent)
   page:SetAllPoints()
   local title = text(page, 18, COL.text); title:SetPoint("TOPLEFT", 20, -16); title:SetText("Crafting")
   local sub = text(page, 11, COL.muted); sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -5)
-  sub:SetText("Profit for the recipes you know. Open each profession window once so Flip Finder can read your recipes.")
+  sub:SetText("Profit for the recipes you know. Open each profession window once so Gold Forge can read your recipes.")
 
   -- controls
   local card = box(page, COL.card, COL.line)

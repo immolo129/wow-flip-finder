@@ -1,4 +1,4 @@
--- Flip Finder: price lines on item tooltips.
+-- Gold Forge: price lines on item tooltips.
 local _, FF = ...
 
 local function addLines(tooltip, itemID)
@@ -7,7 +7,7 @@ local function addLines(tooltip, itemID)
   if not (s.realm or s.region or s.sale) then return end
   local gold = "|cffe9c25a"
   tooltip:AddLine(" ")
-  tooltip:AddLine(gold .. "Flip Finder|r")
+  tooltip:AddLine(gold .. "Gold Forge|r")
   if s.realm then tooltip:AddDoubleLine("Realm value", FF.Money(s.realm), 1, 1, 1) end
   if s.minBuyout then tooltip:AddDoubleLine("Lowest buyout", FF.Money(s.minBuyout), 1, 1, 1) end
   if s.region then tooltip:AddDoubleLine("Region value", FF.Money(s.region), 1, 1, 1) end

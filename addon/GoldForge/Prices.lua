@@ -1,4 +1,4 @@
--- Flip Finder: prices and sales data from TradeSkillMaster's public API (TSM_API).
+-- Gold Forge: prices and sales data from TradeSkillMaster's public API (TSM_API).
 -- TSM's desktop app keeps this data fresh; we only read it.
 local _, FF = ...
 

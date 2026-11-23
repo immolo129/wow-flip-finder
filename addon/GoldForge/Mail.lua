@@ -1,4 +1,4 @@
--- Flip Finder: mailbox helper. One click collects the gold and items from auction mail (sales, purchases,
+-- Gold Forge: mailbox helper. One click collects the gold and items from auction mail (sales, purchases,
 -- expired and cancelled auctions), one mail at a time, like Blizzard's own "Open All" and the Postal addon.
 -- It never touches COD mail (that would cost gold), only auction mail, and stops when the bags are full.
 -- Sales are recorded for the Earnings page before their mail is taken.

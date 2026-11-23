@@ -1,5 +1,5 @@
--- Flip Finder: price history and the item window.
--- TSM doesn't share its price history with other addons, so Flip Finder records its own: whenever a scan
+-- Gold Forge: price history and the item window.
+-- TSM doesn't share its price history with other addons, so Gold Forge records its own: whenever a scan
 -- sees an item you care about (on a list, an alert, a deal, a known recipe, or opened in the item window),
 -- its lowest price is saved, one point per 2 hours, kept for 7 days. The chart fills in as you scan.
 local _, FF = ...
@@ -87,8 +87,8 @@ local function buildWindow()
   win:SetSize(620, 400); win:SetPoint("CENTER", 0, 60); win:SetFrameStrata("DIALOG"); win:SetToplevel(true)
   win:SetMovable(true); win:EnableMouse(true); win:RegisterForDrag("LeftButton"); win:SetClampedToScreen(true)
   win:SetScript("OnDragStart", win.StartMoving); win:SetScript("OnDragStop", win.StopMovingOrSizing)
-  _G.FlipFinderItemWindow = win
-  table.insert(UISpecialFrames, "FlipFinderItemWindow")
+  _G.GoldForgeItemWindow = win
+  table.insert(UISpecialFrames, "GoldForgeItemWindow")
   win.range = FF.db.historyRange or 7
 
   win.icon = win:CreateTexture(nil, "ARTWORK"); win.icon:SetSize(36, 36); win.icon:SetPoint("TOPLEFT", 16, -14)
@@ -165,7 +165,7 @@ function History.Draw()
   win.stats[6].v:SetText(lowest and FF.Money(lowest) or "|cff5f5f69-|r")
   local w, h = plot:GetWidth(), plot:GetHeight()
   win.empty:SetShown(#pts < 2)
-  win.empty:SetText(#pts == 0 and "No price history yet. It builds up as Flip Finder sees this item in your scans."
+  win.empty:SetText(#pts == 0 and "No price history yet. It builds up as Gold Forge sees this item in your scans."
     or "Only one price so far. The line appears after the next scan in a later 2-hour window.")
   if #pts >= 2 and w > 10 then
     local lo, hi = math.huge, 0

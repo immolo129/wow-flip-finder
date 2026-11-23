@@ -1,4 +1,4 @@
--- Flip Finder: posting. Scans your bags, checks each item's competition and works out a price
+-- Gold Forge: posting. Scans your bags, checks each item's competition and works out a price
 -- (undercut the cheapest, within your min/max % of value). Posting itself is ONE CLICK PER AUCTION:
 -- Blizzard only lets addons post from a real click, so "Post next" posts one item per press.
 local _, FF = ...
@@ -112,7 +112,7 @@ function Post.Scan()
       r.state, r.note, r.why = "skip", "No TSM price", "TSM has no price for this item yet. Open the TSM app so it syncs, then /reload."
       table.insert(kept, r)
     elseif cfg.onlyFlipped and not FF.db.flipped[r.itemID] then
-      r.state, r.note, r.why = "skip", "Not flipped", "\"Only items I flipped\" is on and you didn't buy this with Flip Finder."
+      r.state, r.note, r.why = "skip", "Not flipped", "\"Only items I flipped\" is on and you didn't buy this with Gold Forge."
       table.insert(kept, r)
     elseif r.value * r.qty < cfg.minValue then
       r.state, r.note = "skip", "Under min value"
