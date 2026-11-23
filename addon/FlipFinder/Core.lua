@@ -1,7 +1,7 @@
 -- Flip Finder: core. Settings, events, money formatting, logging and slash commands.
 local ADDON, FF = ...
 _G.FlipFinder = FF
-FF.version = "0.7.2"
+FF.version = "0.8.0"
 
 -- Settings. Money is in copper (1g = 10000), percentages are whole numbers.
 local DEFAULTS = {
@@ -75,6 +75,8 @@ local DEFAULTS = {
   history = {},             -- price history recorded from scans: itemID -> { {time, lowest, market}, ... }
   tracked = {},             -- items whose price history is recorded even if on no list
   historyRange = 7,
+  invest = { scope = "theme:tier", minDiscount = 20, maxBuyPct = 85, minSold = 5, budget = 5000000, holdDays = 1,
+             risenPct = 20, onlyBuys = false },
   earnings = { range = 7, onlyFlipped = false },
   page = "commodity",
   log = {},

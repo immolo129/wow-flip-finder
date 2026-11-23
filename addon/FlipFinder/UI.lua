@@ -226,6 +226,7 @@ local function numberField(parent, caption, cfg, key, scale, tip)
     eb:SetScript("OnLeave", GameTooltip_Hide)
   end
   f.Refresh = show
+  f.eb = eb
   return f
 end
 
@@ -256,6 +257,8 @@ local function buyCommodity(d)
   d.state = "starting"
   AH.StartCommoditiesPurchase(d.itemID, d.buy)
 end
+
+UI.BuyCommodity = buyCommodity   -- the Investments page buys through the same two-click flow
 
 local function buyItems(d)
   if d.state ~= "ready" then
@@ -833,6 +836,7 @@ local NAV = {
   { key = "post", name = "Post", icon = "Interface\\Icons\\INV_Letter_15" },
   { key = "cancel", name = "Cancel scan", icon = "Interface\\Icons\\Spell_ChargeNegative" },
   { key = "crafting", name = "Crafting", icon = "Interface\\Icons\\Trade_BlackSmithing" },
+  { key = "invest", name = "Investments", icon = "Interface\\Icons\\INV_Misc_Coin_17" },
   { sep = true },
   { key = "earnings", name = "Earnings", icon = "Interface\\Icons\\INV_Misc_Coin_02" },
 }

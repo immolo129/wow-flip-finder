@@ -31,6 +31,15 @@ end
 
 function History.Track(itemID) tracked()[itemID] = true end
 
+-- change in the lowest price over the recorded history (up to 7 days), or nil with less than a day of it
+function History.Change(itemID)
+  local list = hist()[itemID]
+  if not list or #list < 2 then return nil end
+  local first, last = list[1], list[#list]
+  if last[1] - first[1] < 86400 or first[2] <= 0 then return nil end
+  return last[2] / first[2] - 1
+end
+
 -- record the lowest price seen for an item in the current 2-hour bucket
 function History.Record(itemID, price, force)
   if not itemID or not price or price <= 0 then return end
