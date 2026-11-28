@@ -109,6 +109,15 @@ FF:On("COMBAT_LOG_EVENT_UNFILTERED", function()
   if src ~= UnitGUID("player") and src ~= UnitGUID("pet") then return end
   if not touch() then return end
   S.kills = S.kills + 1
+  local map = C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
+  local pos = map and C_Map.GetPlayerMapPosition(map, "player")
+  if pos then
+    local x, y = pos:GetXY()
+    if x and x > 0 then
+      S.pos = S.pos or { map = map, x = 0, y = 0, n = 0 }
+      if S.pos.map == map then S.pos.x, S.pos.y, S.pos.n = S.pos.x + x, S.pos.y + y, S.pos.n + 1 end
+    end
+  end
   local id = npcID(dst)
   if id then
     local m = S.mobs[id] or { name = dstName, n = 0 }
@@ -356,8 +365,57 @@ local function mapIDFor(zone)
   end
   mapCache[zone] = false
 end
+-- the best place to pin for a farm: your saved spot, where you've killed its mobs, its route, or the zone
+function Farm.Spot(f)
+  local saved = db().spots and db().spots[f.id]
+  if saved then return saved.map, saved.x, saved.y, "your saved spot" end
+  local m, x, y, n = nil, 0, 0, 0
+  for _, s in ipairs(db().sessions) do
+    if s.pos and s.pos.n > 0 and Farm.FarmOf(s) == f then
+      if not m then m = s.pos.map end
+      if s.pos.map == m then x, y, n = x + s.pos.x, y + s.pos.y, n + s.pos.n end
+    end
+  end
+  if S and S.pos and S.pos.n > 0 and Farm.FarmOf(S) == f and (not m or S.pos.map == m) then
+    m = m or S.pos.map
+    x, y, n = x + S.pos.x, y + S.pos.y, n + S.pos.n
+  end
+  if n > 0 then return m, x / n, y / n, "where you've farmed it (" .. n .. " kills)" end
+  if f.route then return nil end
+  local zm = mapIDFor(f.zone)
+  if zm then return zm, 0.5, 0.5, "the zone only: farm here once or press Save spot for an exact pin" end
+end
+
+-- Save spot: remember where you're standing as this farm's pin
+function Farm.SaveSpot(f)
+  local map = C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
+  local pos = map and C_Map.GetPlayerMapPosition(map, "player")
+  local x, y = pos and pos:GetXY()
+  if not x or x == 0 then FF.Kit.status("Can't read your position here (inside an instance?). Save the spot outside, e.g. at the entrance."); return end
+  db().spots = db().spots or {}
+  db().spots[f.id] = { map = map, x = x, y = y }
+  FF.Kit.status(string.format("Saved this spot for %s (%.0f, %.0f).", f.name, x * 100, y * 100))
+  FF:Fire("FF_FARM_CHANGED")
+end
+
+local function setPin(m, x, y)
+  if not (C_Map.SetUserWaypoint and UiMapPoint) then return false end
+  local ok = pcall(C_Map.SetUserWaypoint, UiMapPoint.CreateFromCoordinates(m, x, y))
+  if ok and C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint then C_SuperTrack.SetSuperTrackedUserWaypoint(true) end
+  return ok
+end
+
 function Farm.PinNext(f)
-  if not f.route then return end
+  local sm, sx, sy, how = Farm.Spot(f)
+  if sm then
+    if setPin(sm, sx, sy) then
+      FF.Kit.status(string.format("Map pin for %s at (%.0f, %.0f): %s.", f.name, sx * 100, sy * 100, how))
+    else
+      FF.Kit.status("The game didn't accept a map pin there.")
+    end
+    return
+  end
+  if not f.route then FF.Kit.status("No map position for " .. f.name .. ". Stand at the spot and press Save spot."); return end
   local m = mapIDFor(f.zone)
   if not m then FF.Kit.status("Couldn't find " .. f.zone .. " on the map."); return end
   if TomTom and TomTom.AddWaypoint and not f.tomtom then
@@ -366,11 +424,36 @@ function Farm.PinNext(f)
   end
   f.pinIdx = (f.pinIdx or 0) % #f.route + 1
   local p = f.route[f.pinIdx]
-  if C_Map.SetUserWaypoint and UiMapPoint then
-    C_Map.SetUserWaypoint(UiMapPoint.CreateFromCoordinates(m, p[1] / 100, p[2] / 100))
-    if C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint then C_SuperTrack.SetSuperTrackedUserWaypoint(true) end
-  end
+  setPin(m, p[1] / 100, p[2] / 100)
   FF.Kit.status(string.format("Map pin %d/%d: %s (%d, %d). Click again for the next point.", f.pinIdx, #f.route, p[3], p[1], p[2]))
+end
+
+-- ---------- "where to farm" for item tooltips ----------
+local whereIndex
+local ratesCache, ratesAt = nil, 0
+function Farm.WhereToFarm(itemID)
+  if not whereIndex then
+    whereIndex = {}
+    local function add(id, e) whereIndex[id] = whereIndex[id] or {}; table.insert(whereIndex[id], e) end
+    for _, f in ipairs(FF.FarmData or {}) do
+      for _, d in ipairs(f.drops or {}) do add(d[1], { farm = f, chance = d[2] }) end
+    end
+    for _, sp in ipairs(Farm.Spots) do
+      local dup = false
+      for _, e in ipairs(whereIndex[sp[1]] or {}) do if e.farm then dup = true end end
+      if not dup then add(sp[1], { where = sp[2], source = sp[3] }) end
+    end
+    -- best (highest chance) first, dead farms last
+    for _, list in pairs(whereIndex) do
+      table.sort(list, function(a, b)
+        local da, db_ = a.farm and a.farm.status == "dead", b.farm and b.farm.status == "dead"
+        if da ~= db_ then return db_ end
+        return (a.chance or 0) > (b.chance or 0)
+      end)
+    end
+  end
+  if not ratesCache or GetTime() - ratesAt > 30 then ratesCache, ratesAt = Farm.Rates(), GetTime() end
+  return whereIndex[itemID], ratesCache[itemID]
 end
 
 -- ---------- the small farming bar ----------
@@ -506,6 +589,13 @@ FF.UI.RegisterPage("farm", function(parent)
     r.detail = text(r, 11, COL.muted, nil, false); r.detail:SetJustifyH("LEFT"); r.detail:SetWordWrap(true)
     r.pin = button(r, "Map pin", 84, 22, "ghost", function() if r.data and r.data.farm then Farm.PinNext(r.data.farm) end end)
     r.pin:SetPoint("TOPRIGHT", -12, -4)
+    r.save = button(r, "Save spot", 84, 22, "ghost", function() if r.data and r.data.farm then Farm.SaveSpot(r.data.farm) end end)
+    r.save:SetPoint("TOPRIGHT", r.pin, "BOTTOMRIGHT", 0, -6)
+    r.save:SetScript("OnEnter", function(s)
+      GameTooltip:SetOwner(s, "ANCHOR_LEFT"); GameTooltip:SetText("Save spot", 1, 1, 1)
+      GameTooltip:AddLine("Stand where you farm this and click: the map pin goes here from now on.", nil, nil, nil, true); GameTooltip:Show()
+    end)
+    r.save:SetScript("OnLeave", GameTooltip_Hide)
     r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     r:SetScript("OnClick", function(s, mouse)
       local d = s.data
@@ -520,8 +610,13 @@ FF.UI.RegisterPage("farm", function(parent)
         local f = d.farm
         GameTooltip:SetOwner(s, "ANCHOR_RIGHT"); GameTooltip:SetText(f.name, 1, 1, 1)
         GameTooltip:AddLine((f.zone or "") .. (f.area and (" · " .. f.area) or ""), 0.8, 0.8, 0.85, true)
+        for _, dr in ipairs(f.drops or {}) do
+          GameTooltip:AddDoubleLine((C_Item.GetItemNameByID(dr[1]) or ("item " .. dr[1])) .. (dr[2] and string.format(" (%.1f%%)", dr[2]) or ""),
+            FF.Money(Farm.ItemValue(dr[1])), 1, 1, 1)
+        end
+        if f.skill then GameTooltip:AddLine(string.format("Skinning %d-%d", f.skill[1], f.skill[2]), 0.8, 0.8, 0.85) end
         if f.notes then GameTooltip:AddLine(f.notes, 0.95, 0.72, 0.11, true) end
-        GameTooltip:AddLine("Click: drops and details", 0.56, 0.56, 0.6); GameTooltip:Show()
+        GameTooltip:AddLine("Click: details · Map pin: show it on the map", 0.56, 0.56, 0.6); GameTooltip:Show()
         return
       end
       if not d.itemID then return end
@@ -588,7 +683,8 @@ FF.UI.RegisterPage("farm", function(parent)
       r.data = d
       r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y); r:SetPoint("RIGHT", content, "RIGHT")
       local vals
-      r.pin:SetShown(v == "farms" and d.farm and d.farm.route ~= nil)
+      r.pin:SetShown(v == "farms" and d.farm and d.farm.zone ~= "Anywhere")
+      r.save:SetShown(v == "farms" and d.farm and d.farm.zone ~= "Anywhere" and expanded[d.key] == true)
       if v == "farms" then
         local f = d.farm
         r.icon:Show()
@@ -664,6 +760,8 @@ FF.UI.RegisterPage("farm", function(parent)
             for _, p in ipairs(f.route) do table.insert(pts, string.format("%s (%d, %d)", p[3], p[1], p[2])) end
             table.insert(lines, "|cfff2b81dRoute:|r " .. table.concat(pts, " -> ") .. "   (Map pin button: next point)")
           end
+          local sm, sx, sy, how = Farm.Spot(f)
+          if sm then table.insert(lines, string.format("|cfff2b81dMap pin:|r (%.0f, %.0f), %s.", sx * 100, sy * 100, how)) end
           if f.notes then table.insert(lines, "|cff8e8e99" .. f.notes .. "|r") end
           if d.key == "ungoro_devilsaur" or d.key == "weekly_elven_curiosities" then
             table.insert(lines, "|cff8e8e99Checks: " .. table.concat(FF.FarmReminders or {}, " · ") .. "|r")
@@ -688,7 +786,7 @@ FF.UI.RegisterPage("farm", function(parent)
           table.insert(lines, string.format("%d sessions · %d kills", d.sessions, d.kills))
           table.insert(lines, "|cfff2b81dBest loot:|r " .. (#parts > 0 and table.concat(parts, ",  ") or "none"))
         end
-        r.detail:ClearAllPoints(); r.detail:SetPoint("TOPLEFT", 44, -K.ROW_H); r.detail:SetWidth(width - 60)
+        r.detail:ClearAllPoints(); r.detail:SetPoint("TOPLEFT", 44, -K.ROW_H); r.detail:SetWidth(width - (v == "farms" and 160 or 60))
         r.detail:SetText(table.concat(lines, "\n"))
         h = K.ROW_H + r.detail:GetStringHeight() + 10
       end
