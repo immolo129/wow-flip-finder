@@ -37,6 +37,23 @@ Invest.Themes = {
       { 13457, "Fire protection" }, { 13456, "Frost protection" }, { 13458, "Nature protection" }, { 13459, "Shadow protection" },
       { 3387 }, { 9088 }, { 12820 }, { 20452 }, { 12404 }, { 13468, "Black Market NPC caps it at 50g" }, { 8846 },
     } },
+  { key = "food", name = "Raid food (new +20 stat foods)",
+    event = "Raid week", eventAt = day(2026, 12, 9),
+    sellFrom = day(2026, 12, 7), sellPeak = day(2026, 12, 9), sellTo = day(2026, 12, 16),
+    why = "Forever added +20 stat foods. The meats are cheap now while few cooks have the recipes; demand comes when raiders "
+      .. "buy food for the new raids. Soothing Spices is left out: vendors sell it. Rows with a recipe also show if crafting pays.",
+    items = {
+      { 3712, "Turtle Meat: 3 per Savory Turtle Stew (+20 Stamina). Recipe drops from Child of Tortolla, Mount Hyjal." },
+      { 5471, "Stag Meat: 3 per Steaming Stag Steak (+20 Strength). Recipe from an early Mount Hyjal quest. Called the most likely good investment." },
+      { 12202, "Tiger Meat: 3 per Swiftstrike Steak (+20 Agility). Recipe drops from Frostsaber Pride Watchers, Winterspring." },
+      { 12223, "Meaty Bat Wing: 3 per Bat Hachee (+20 Intellect). Recipe drops from Monstrous Plaguebats, Eastern Plaguelands." },
+      { 20424, "Sandworm Meat: for Smoked Desert Dumplings (+20 Strength). The priciest meat." },
+      { 250068, "Savory Turtle Stew (+20 Stamina)", craft = { { 3712, 3 }, { 3713, 3 } } },
+      { 250071, "Steaming Stag Steak (+20 Strength)", craft = { { 5471, 3 }, { 3713, 4 } } },
+      { 250072, "Swiftstrike Steak (+20 Agility)", craft = { { 12202, 3 }, { 3713, 2 } } },
+      { 250067, "Bat Hachee (+20 Intellect)", craft = { { 12223, 3 }, { 3713, 2 } } },
+      { 20452, "Smoked Desert Dumplings", craft = { { 20424, 1 }, { 3713, 1 } } },
+    } },
   { key = "ench", name = "Enchanting & crafting materials",
     why = "Materials for enchants and crafted gear. No fixed date: buy when they're cheap, sell when they're back to normal.",
     items = {
@@ -78,7 +95,19 @@ end
 
 local function noteOf(theme, itemID)
   if not theme then return nil end
-  for _, it in ipairs(theme.items) do if it[1] == itemID then return it[2] end end
+  for _, it in ipairs(theme.items) do if it[1] == itemID then return it[2], it.craft end end
+end
+
+-- crafting check for food/crafted rows: cost of the reagents (cheapest of AH value and vendor price)
+function Invest.CraftCost(craft)
+  local total = 0
+  for _, r in ipairs(craft) do
+    local ah, vendor = FF.Value(r[1]), FF.Raw("vendorBuy", r[1])
+    local each = (ah and vendor) and math.min(ah, vendor) or ah or vendor
+    if not each then return nil end
+    total = total + each * r[2]
+  end
+  return total
 end
 
 -- Judge one item. now = cheapest price on the AH right now, ladder = the full price list (or nil).
@@ -143,9 +172,10 @@ local function changed() FF:Fire("FF_INVEST_CHANGED") end
 
 local function newRow(itemID, scope)
   local theme = themeOf(scope, itemID)
+  local note, craft = noteOf(theme, itemID)
   return {
     itemID = itemID, name = C_Item.GetItemNameByID(itemID) or ("Item " .. itemID),
-    quality = select(3, C_Item.GetItemInfo(itemID)), theme = theme, note = noteOf(theme, itemID),
+    quality = select(3, C_Item.GetItemInfo(itemID)), theme = theme, note = note, craft = craft,
     verdict = "checking",
   }
 end
@@ -473,6 +503,15 @@ FF.UI.RegisterPage("invest", function(parent)
           FF.Money(d.region), FF.Money(d.market), d.trend and pct(d.trend) or "not enough scans yet",
           d.onAH and tostring(d.onAH) or "-",
           (d.onAH and d.soldPerDay and d.soldPerDay > 0) and string.format(" (%.1f days of sales)", d.onAH / d.soldPerDay) or ""))
+        if d.craft then
+          local cost = Invest.CraftCost(d.craft)
+          local sells = d.now or d.normal
+          if cost and sells then
+            local margin = sells * (1 - FF.Sniper.Cut()) - cost
+            table.insert(parts, string.format("|cfff2b81dCrafting:|r reagents %s, sells for %s  ->  %s%s|r per craft after AH cut",
+              FF.Money(cost), FF.Money(sells), margin >= 0 and "|cff58c27d+" or "|cffe0605a-", FF.Money(math.abs(margin))))
+          end
+        end
         if d.why then table.insert(parts, "|cff8e8e99" .. d.why .. (d.note and ("  " .. d.note) or "") .. "|r") end
         r.detail:ClearAllPoints(); r.detail:SetPoint("TOPLEFT", 44, -K.ROW_H); r.detail:SetWidth(width - 60)
         r.detail:SetText(table.concat(parts, "\n"))
