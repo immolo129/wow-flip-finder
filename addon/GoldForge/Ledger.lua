@@ -67,6 +67,36 @@ end
 FF:On("MAIL_INBOX_UPDATE", scanMail)
 Ledger.ScanMail = scanMail   -- the mailbox helper calls this before taking a mail
 
+-- ---------- sell-through: how often your auctions of an item sell instead of expiring ----------
+-- From your own auction mail: each "sold" mail is one auction that sold, each "expired" mail one that didn't.
+local stCache
+FF:On("FF_LEDGER_CHANGED", function() stCache = nil end)
+Ledger.MIN_AUCTIONS = 3
+function Ledger.SellThrough(name)
+  if not name then return nil end
+  if not stCache then
+    stCache = {}
+    local l = db()
+    for _, s in ipairs(l.sales) do
+      local e = stCache[s.name] or { sold = 0, expired = 0 }; e.sold = e.sold + 1; stCache[s.name] = e
+    end
+    for _, x in ipairs(l.expired) do
+      local e = stCache[x.name] or { sold = 0, expired = 0 }; e.expired = e.expired + 1; stCache[x.name] = e
+    end
+    for _, e in pairs(stCache) do
+      e.total = e.sold + e.expired
+      e.rate = e.total > 0 and e.sold / e.total or nil
+    end
+  end
+  local e = stCache[name]
+  if not e or e.total < Ledger.MIN_AUCTIONS then return nil, e end
+  return e.rate, e
+end
+-- short text like "2 of 6 sold (33%)"
+function Ledger.SellThroughText(e)
+  return e and string.format("%d of %d sold (%d%%)", e.sold, e.total, (e.rate or 0) * 100 + 0.5) or nil
+end
+
 -- ---------- numbers ----------
 local function isFlipped(name) return FF.db.flippedNames and FF.db.flippedNames[name] end
 

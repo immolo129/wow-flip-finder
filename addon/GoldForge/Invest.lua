@@ -149,9 +149,15 @@ function Invest.Evaluate(row, now, ladder)
   for _, l in ipairs(ladder or {}) do row.onAH = row.onAH + l.qty end
   if not ladder then row.onAH = nil end
 
+  -- your own sell-through for this item (from auction mail), when you've posted it at least 3 times
+  local stRate, st = FF.Ledger.SellThrough(row.name)
+  row.sellThrough, row.st = stRate, st
+
   -- verdict
   if row.vs * 100 >= cfg.risenPct then
     row.verdict, row.why = "risen", string.format("Already %d%% above its normal price: the rise has happened, don't buy now.", row.vs * 100 + 0.5)
+  elseif stRate and stRate < 0.4 then
+    row.verdict, row.why = "slow", "For you it usually expires: " .. FF.Ledger.SellThroughText(st) .. " of your auctions sold."
   elseif (row.soldPerDay or 0) < cfg.minSold then
     row.verdict, row.why = "slow", string.format("Sells only %.1f a day in the region: hard to sell again.", row.soldPerDay or 0)
   elseif -row.vs * 100 >= cfg.minDiscount and qty > 0 and (row.profit or 0) > 0 then
@@ -499,6 +505,10 @@ FF.UI.RegisterPage("invest", function(parent)
         table.insert(parts, string.format("|cfff2b81dPlan:|r buy %d up to %s each for %s, resell at %s each  ->  %s profit after %d%% AH cut and %s deposit",
           d.buy or 0, FF.Money(d.top), FF.Money(d.cost), FF.Money(d.target), FF.Money(d.profit),
           FF.Sniper.Cut() * 100, FF.Money(d.deposit)))
+        if d.st and d.st.total > 0 then
+          table.insert(parts, "|cfff2b81dYour sell-through:|r " .. FF.Ledger.SellThroughText(d.st)
+            .. (d.sellThrough and "" or string.format("  (needs %d auctions to count)", FF.Ledger.MIN_AUCTIONS)))
+        end
         table.insert(parts, string.format("Region average %s  ·  Market (recent) %s  ·  Your 7-day history %s  ·  On the AH %s%s",
           FF.Money(d.region), FF.Money(d.market), d.trend and pct(d.trend) or "not enough scans yet",
           d.onAH and tostring(d.onAH) or "-",

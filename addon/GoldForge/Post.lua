@@ -143,6 +143,15 @@ function Post.Scan()
   for _, r in ipairs(Post.rows) do if r.state == "checking" then
     local function priced(ladder)
       r.price, r.note = Post.Price(r, ladder)
+      local rate, st = FF.Ledger.SellThrough(r.name)
+      if rate and r.price then
+        r.why = (r.why or "") .. "
+Your auctions of this: " .. FF.Ledger.SellThroughText(st) .. "."
+        if rate < 0.5 then
+          r.note = r.note .. " · usually expires"
+          r.why = r.why .. " It often expires for you: a shorter duration or a lower price may sell better."
+        end
+      end
       r.deposit = r.price and deposit(r) or nil
       r.state = r.price and "ready" or "skip"
       Post.left = Post.left - 1
