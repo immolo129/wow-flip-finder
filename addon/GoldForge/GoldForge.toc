@@ -2,7 +2,7 @@
 ## Title: Gold Forge
 ## Notes: Private flipping helper for WoW: Forever. Finds deals on the auction house using TradeSkillMaster's price and sales data.
 ## Author: immolo129
-## Version: 0.8.1
+## Version: 0.9.0
 ## OptionalDeps: TradeSkillMaster
 ## SavedVariables: GoldForgeDB
 ## IconTexture: Interface\Icons\INV_Misc_Coin_02
@@ -19,6 +19,7 @@ Ledger.lua
 Lists.lua
 Crafting.lua
 Invest.lua
+Farm.lua
 Mail.lua
 History.lua
 Alerts.lua

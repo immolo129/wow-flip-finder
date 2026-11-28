@@ -837,6 +837,7 @@ local NAV = {
   { key = "cancel", name = "Cancel scan", icon = "Interface\\Icons\\Spell_ChargeNegative" },
   { key = "crafting", name = "Crafting", icon = "Interface\\Icons\\Trade_BlackSmithing" },
   { key = "invest", name = "Investments", icon = "Interface\\Icons\\INV_Misc_Coin_17" },
+  { key = "farm", name = "Gold Guide", icon = "Interface\\Icons\\INV_Misc_Pelt_Wolf_01" },
   { sep = true },
   { key = "earnings", name = "Earnings", icon = "Interface\\Icons\\INV_Misc_Coin_02" },
 }
