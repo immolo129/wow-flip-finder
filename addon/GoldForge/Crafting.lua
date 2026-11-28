@@ -167,7 +167,7 @@ FF.UI.RegisterPage("crafting", function(parent)
   local BTN = 120
   local heads = {}
   for i, c in ipairs(COLS) do
-    local h = text(list, 10, COL.muted, nil, true); h:SetText(c[1]:upper()); h:SetJustifyH(c[3] or "RIGHT")
+    local h = text(list, 11, COL.muted, nil, true); h:SetText(c[1]); h:SetJustifyH(c[3] or "RIGHT")
     heads[i] = h
   end
   local scroll = CreateFrame("ScrollFrame", nil, list)
@@ -253,8 +253,8 @@ FF.UI.RegisterPage("crafting", function(parent)
       r.icon:SetTexture(C_Item.GetItemIconByID(d.itemID))
       local quality = select(3, C_Item.GetItemInfo(d.itemID))
       local vals = {
-        FF.QualityColor(quality) .. (C_Item.GetItemNameByID(d.itemID) or d.name or "?") .. "|r" .. (d.qty ~= 1 and ("  |cff8e8e99x" .. d.qty .. "|r") or ""),
-        d.profession, d.cost and FF.Money(d.cost) or "|cff5f5f69no price|r", d.sells and FF.Money(d.sells) or "|cff5f5f69no price|r",
+        FF.QualityColor(quality) .. (C_Item.GetItemNameByID(d.itemID) or d.name or "?") .. "|r" .. (d.qty ~= 1 and ("  |cffa39a8cx" .. d.qty .. "|r") or ""),
+        d.profession, d.cost and FF.Money(d.cost) or "|cff6e665bno price|r", d.sells and FF.Money(d.sells) or "|cff6e665bno price|r",
         d.profit and FF.Money(d.profit) or "-", d.roi and string.format("%d%%", d.roi * 100 + 0.5) or "-",
         d.soldPerDay and string.format("%.0f", d.soldPerDay) or "-", d.saleRate and string.format("%d%%", d.saleRate * 100 + 0.5) or "-",
       }
@@ -278,7 +278,7 @@ FF.UI.RegisterPage("crafting", function(parent)
             p.price and FF.Money(p.price) or "no price", p.src == "vendor" and ", vendor" or ""))
         end
         r.detail:ClearAllPoints(); r.detail:SetPoint("TOPLEFT", 44, -K.ROW_H); r.detail:SetWidth(width - 60)
-        r.detail:SetText("|cfff2b81dReagents:|r  " .. table.concat(parts, ",  "))
+        r.detail:SetText("|cffe8b13aReagents:|r  " .. table.concat(parts, ",  "))
         h = K.ROW_H + r.detail:GetStringHeight() + 10
       end
       r:SetHeight(h)

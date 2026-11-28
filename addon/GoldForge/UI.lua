@@ -7,11 +7,20 @@ FF.UI = UI
 local AH = C_AuctionHouse
 
 -- ---------- look ----------
+-- The forge palette: warm soot and anvil blacks, bronze edges, parchment text, one molten gold.
 local COL = {
-  bg = { 0.055, 0.055, 0.063, 0.97 }, side = { 0.043, 0.043, 0.05, 1 }, card = { 0.09, 0.09, 0.105, 1 },
-  field = { 0.115, 0.115, 0.13, 1 }, line = { 0.17, 0.17, 0.19, 1 }, line2 = { 0.24, 0.24, 0.27, 1 },
-  text = { 0.93, 0.93, 0.95 }, muted = { 0.56, 0.56, 0.6 }, dim = { 0.38, 0.38, 0.42 },
-  gold = { 0.95, 0.72, 0.11 }, goldText = { 0.1, 0.07, 0 }, green = { 0.29, 0.87, 0.5 }, red = { 0.97, 0.44, 0.44 },
+  bg = { 0.102, 0.094, 0.086, 0.97 },   -- soot     #1A1816  window
+  side = { 0.071, 0.067, 0.063, 1 },    -- anvil    #121110  header and menu
+  card = { 0.133, 0.122, 0.110, 1 },    -- slag     #221F1C  panels
+  field = { 0.165, 0.149, 0.133, 1 },   --          #2A2622  inputs and buttons
+  line = { 0.227, 0.204, 0.176, 1 },    -- bronze   #3A342D  borders
+  line2 = { 0.302, 0.271, 0.231, 1 },   --          #4D453B  stronger borders
+  text = { 0.929, 0.902, 0.855 },       -- parchment #EDE6DA
+  muted = { 0.639, 0.604, 0.549 },      --          #A39A8C
+  dim = { 0.431, 0.400, 0.357 },        --          #6E665B
+  gold = { 0.910, 0.694, 0.227 },       -- molten gold #E8B13A
+  goldText = { 0.12, 0.08, 0.02 },      -- text on gold
+  green = { 0.42, 0.82, 0.48 }, red = { 0.94, 0.42, 0.38 },
 }
 -- Inter (SIL Open Font License, see Media/FONTS-LICENSE.txt); the game's font if it can't load
 local FONT = "Interface\\AddOns\\GoldForge\\Media\\Inter-Regular.ttf"
@@ -336,7 +345,7 @@ local function nextRow(rows, top)
     local jump = top and top > 0 and string.format("  |cff58c27d+%d%%|r", (r.price / top - 1) * 100) or ""
     table.insert(parts, r.qty .. " x " .. FF.Money(r.price) .. jump)
   end
-  return #parts > 0 and table.concat(parts, "   ") or "|cff8e8e99nobody else: you'd be the only seller|r"
+  return #parts > 0 and table.concat(parts, "   ") or "|cffa39a8cnobody else: you'd be the only seller|r"
 end
 
 -- the deal's item name; if the game hadn't loaded it yet ("Item 4411"), ask for it again
@@ -468,7 +477,7 @@ local function buildSniperPage(parent, mode)
   for i, col in ipairs(DEAL_COLS) do
     local h = CreateFrame("Button", nil, headRow)
     h:SetHeight(18)
-    h.t = text(h, 10, COL.muted, nil, true); h.t:SetAllPoints(); h.t:SetJustifyH(col.align or "RIGHT")
+    h.t = text(h, 11, COL.muted, nil, true); h.t:SetAllPoints(); h.t:SetJustifyH(col.align or "RIGHT")
     h:SetScript("OnClick", function()
       if sortState.key == col.key then sortState.asc = not sortState.asc
       else sortState.key, sortState.asc = col.key, col.key == "name" end
@@ -623,16 +632,16 @@ local function buildSniperPage(parent, mode)
       r.detail:ClearAllPoints(); r.detail:SetPoint("TOPLEFT", PAD + ICON, -ROW_H); r.detail:SetWidth(w)
       r.detail2:ClearAllPoints(); r.detail2:SetPoint("TOPLEFT", r.detail, "BOTTOMLEFT", 0, -4); r.detail2:SetWidth(w)
       r.detail3:ClearAllPoints(); r.detail3:SetPoint("TOPLEFT", r.detail2, "BOTTOMLEFT", 0, -4); r.detail3:SetWidth(w)
-      r.detail:SetText("|cfff2b81dYou buy:|r  " .. listRow(d.rows))
-      r.detail2:SetText("|cffe6e6e6Next sellers:|r  " .. nextRow(d.after, d.top))
+      r.detail:SetText("|cffe8b13aYou buy:|r  " .. listRow(d.rows))
+      r.detail2:SetText("|cffede6daNext sellers:|r  " .. nextRow(d.after, d.top))
       local nxt = d.after and d.after[1]
       if d.mode == "vendor" then
-        r.detail3:SetText("|cff8e8e99A vendor pays " .. FF.Money(d.sell) .. " each.|r")
+        r.detail3:SetText("|cffa39a8cA vendor pays " .. FF.Money(d.sell) .. " each.|r")
       elseif nxt then
-        r.detail3:SetText(string.format("|cff8e8e99Price jump:|r  %s  ->  %s  |cff58c27d(+%d%%)|r   |cff8e8e99You resell at %s each, just under the next seller.|r",
+        r.detail3:SetText(string.format("|cffa39a8cPrice jump:|r  %s  ->  %s  |cff58c27d(+%d%%)|r   |cffa39a8cYou resell at %s each, just under the next seller.|r",
           FF.Money(d.top), FF.Money(nxt.price), (nxt.price / d.top - 1) * 100, FF.Money(d.sell)))
       else
-        r.detail3:SetText("|cff8e8e99No one else is selling it: you'd resell at its value, " .. FF.Money(d.sell) .. " each.|r")
+        r.detail3:SetText("|cffa39a8cNo one else is selling it: you'd resell at its value, " .. FF.Money(d.sell) .. " each.|r")
       end
     end
     r:SetHeight(d.expanded and ROW_H + EXPAND_H - 8 or ROW_H)
@@ -666,7 +675,7 @@ local function buildSniperPage(parent, mode)
     -- headers with the sort arrow
     for _, h in ipairs(headers) do
       local on = h.col.key == sortState.key
-      h.t:SetText(h.col.label:upper() .. (on and (sortState.asc and " ^" or " v") or ""))
+      h.t:SetText(h.col.label .. (on and (sortState.asc and " ^" or " v") or ""))
       h.t:SetTextColor(unpack(on and COL.gold or COL.muted))
     end
     -- scanner card
@@ -884,7 +893,16 @@ local function build()
   -- header
   local head = box(frame, COL.side, COL.line)
   head:SetPoint("TOPLEFT", 1, -1); head:SetPoint("TOPRIGHT", -1, -1); head:SetHeight(HEAD)
-  local logo = text(head, 17, COL.gold, "OUTLINE"); logo:SetPoint("LEFT", 16, 0); logo:SetText("FLIP FINDER")
+  local mark = head:CreateTexture(nil, "ARTWORK"); mark:SetSize(22, 22); mark:SetPoint("LEFT", 14, 0)
+  mark:SetTexture("Interface\\Icons\\INV_Misc_Coin_02"); mark:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+  local logo = text(head, 16, COL.gold, nil, true); logo:SetPoint("LEFT", mark, "RIGHT", 9, 0); logo:SetText("Gold Forge")
+  -- the forge glow: one thin line of molten gold under the header, cooling to nothing on the right
+  local glow = head:CreateTexture(nil, "OVERLAY"); glow:SetHeight(2)
+  glow:SetPoint("BOTTOMLEFT", head, "BOTTOMLEFT", 0, 0); glow:SetPoint("BOTTOMRIGHT", head, "BOTTOMRIGHT", 0, 0)
+  glow:SetColorTexture(1, 1, 1, 1)
+  local glowOK = glow.SetGradient and CreateColor
+    and pcall(glow.SetGradient, glow, "HORIZONTAL", CreateColor(0.91, 0.69, 0.23, 0.9), CreateColor(0.91, 0.45, 0.12, 0))
+  if not glowOK then glow:SetColorTexture(0.91, 0.69, 0.23, 0.6) end
   local ver = text(head, 10, COL.dim); ver:SetPoint("LEFT", logo, "RIGHT", 8, -1); ver:SetText("v" .. FF.version)
   local close = flatButton(head, "x", 26, 26, "ghost", function() frame:Hide() end)
   close:SetPoint("RIGHT", -10, 0)
@@ -914,7 +932,7 @@ local function build()
     else
       local b = CreateFrame("Button", nil, side)
       b:SetPoint("TOPLEFT", 6, y); b:SetPoint("TOPRIGHT", -6, y); b:SetHeight(28)
-      b.bg = b:CreateTexture(nil, "BACKGROUND"); b.bg:SetAllPoints(); b.bg:SetColorTexture(1, 1, 1, 0.05)
+      b.bg = b:CreateTexture(nil, "BACKGROUND"); b.bg:SetAllPoints(); b.bg:SetColorTexture(0.91, 0.69, 0.23, 0.10)
       b.bar = b:CreateTexture(nil, "ARTWORK"); b.bar:SetColorTexture(unpack(COL.gold))
       b.bar:SetPoint("TOPLEFT"); b.bar:SetPoint("BOTTOMLEFT"); b.bar:SetWidth(3)
       if n.icon then

@@ -145,8 +145,8 @@ FF.UI.RegisterPage("cancel", function(parent)
   local COLS = { { "Item", 210, "LEFT" }, { "Qty", 40 }, { "Your price", 90 }, { "Cheapest other", 100 }, { "", 210, "LEFT" } }
   local x = 14
   for _, c in ipairs(COLS) do
-    local h = text(list, 10, COL.muted); h:SetWidth(c[2] - 6); h:SetJustifyH(c[3] or "RIGHT")
-    h:SetPoint("TOPLEFT", x + (c[1] == "Item" and 30 or 0) + (c[3] == "LEFT" and c[1] ~= "Item" and 10 or 0), -12); h:SetText(c[1]:upper())
+    local h = text(list, 11, COL.muted, nil, true); h:SetWidth(c[2] - 6); h:SetJustifyH(c[3] or "RIGHT")
+    h:SetPoint("TOPLEFT", x + (c[1] == "Item" and 30 or 0) + (c[3] == "LEFT" and c[1] ~= "Item" and 10 or 0), -12); h:SetText(c[1])
     x = x + c[2]
   end
   local scroll = CreateFrame("ScrollFrame", nil, list)

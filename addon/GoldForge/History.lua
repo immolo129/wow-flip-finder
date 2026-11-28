@@ -120,7 +120,7 @@ local function buildWindow()
     win.rangeBtns[i] = b
   end
   local legend = text(win, 10, COL.muted); legend:SetPoint("TOPLEFT", 16, -177)
-  legend:SetText("|cff3aa8ff—|r Lowest price seen   |cfff2b81d—|r TSM market value")
+  legend:SetText("|cff3aa8ff—|r Lowest price seen   |cffe8b13a—|r TSM market value")
   win.plot = CreateFrame("Frame", nil, win)
   win.plot:SetPoint("TOPLEFT", 76, -206); win.plot:SetPoint("BOTTOMRIGHT", -16, 28)
   win.empty = text(win, 11, COL.dim); win.empty:SetPoint("CENTER", win.plot, "CENTER")
@@ -162,7 +162,7 @@ function History.Draw()
   end
   local lowest
   for _, p in ipairs(pts) do lowest = math.min(lowest or p[2], p[2]) end
-  win.stats[6].v:SetText(lowest and FF.Money(lowest) or "|cff5f5f69-|r")
+  win.stats[6].v:SetText(lowest and FF.Money(lowest) or "|cff6e665b-|r")
   local w, h = plot:GetWidth(), plot:GetHeight()
   win.empty:SetShown(#pts < 2)
   win.empty:SetText(#pts == 0 and "No price history yet. It builds up as Gold Forge sees this item in your scans."

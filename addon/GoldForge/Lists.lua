@@ -129,7 +129,7 @@ FF.UI.RegisterPage("lists", function(parent)
   local COLS = { { "Item", 0, "LEFT" }, { "Value", 90 }, { "Sold/day", 70 }, { "Sell %", 60 } }
   local heads = {}
   for i, c in ipairs(COLS) do
-    local h = text(right, 10, COL.muted, nil, true); h:SetText(c[1]:upper()); h:SetJustifyH(c[3] or "RIGHT")
+    local h = text(right, 11, COL.muted, nil, true); h:SetText(c[1]); h:SetJustifyH(c[3] or "RIGHT")
     heads[i] = h
   end
   local scroll = CreateFrame("ScrollFrame", nil, right)

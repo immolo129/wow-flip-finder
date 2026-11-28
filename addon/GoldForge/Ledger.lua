@@ -210,7 +210,7 @@ FF.UI.RegisterPage("earnings", function(parent)
   local chartCard = box(page, COL.card, COL.line)
   chartCard:SetPoint("TOPLEFT", 20, -138); chartCard:SetPoint("RIGHT", -20, 0); chartCard:SetHeight(210)
   local legend = text(chartCard, 10, COL.muted); legend:SetPoint("TOPLEFT", 14, -10)
-  legend:SetText("|cff4ade80■|r Earned   |cfff87171■|r Spent   |cfff2b81d—|r Running profit")
+  legend:SetText("|cff4ade80■|r Earned   |cfff87171■|r Spent   |cffe8b13a—|r Running profit")
   local plot = CreateFrame("Frame", nil, chartCard)
   plot:SetPoint("TOPLEFT", 74, -30); plot:SetPoint("BOTTOMRIGHT", -14, 26)
   local pool = { tex = {}, lines = {}, labels = {}, hits = {} }
@@ -322,7 +322,7 @@ FF.UI.RegisterPage("earnings", function(parent)
   local ICOLS = { { "Item", 0, "LEFT" }, { "Bought", 60 }, { "Sold", 96 }, { "Avg cost", 84 }, { "Spent", 84 }, { "Earned", 84 }, { "Profit", 84 }, { "ROI", 50 } }
   local heads = {}
   for i, c in ipairs(ICOLS) do
-    local h = text(recent, 10, COL.muted, nil, true); h:SetJustifyH(c[3] or "RIGHT"); h:SetText(c[1]:upper())
+    local h = text(recent, 11, COL.muted, nil, true); h:SetJustifyH(c[3] or "RIGHT"); h:SetText(c[1])
     heads[i] = h
   end
   local lines, cells = {}, {}
@@ -384,16 +384,16 @@ FF.UI.RegisterPage("earnings", function(parent)
         if e then
           c[1]:SetText(e.name)
           c[2]:SetText(tostring(e.bought))
-          c[3]:SetText((e.sold > 0 and tostring(e.sold) or "|cff5f5f69-|r")
+          c[3]:SetText((e.sold > 0 and tostring(e.sold) or "|cff6e665b-|r")
             .. ((e.expired or 0) > 0 and string.format(" |cffe0605a(%d exp.)|r", e.expired) or ""))
           c[4]:SetText(FF.Money(e.avg))
           c[5]:SetText(FF.Money(e.cost))
-          c[6]:SetText(e.earned > 0 and FF.Money(e.earned) or "|cff5f5f69-|r")
-          c[7]:SetText(e.sold > 0 and FF.Money(e.profit) or "|cff5f5f69not sold yet|r")
+          c[6]:SetText(e.earned > 0 and FF.Money(e.earned) or "|cff6e665b-|r")
+          c[7]:SetText(e.sold > 0 and FF.Money(e.profit) or "|cff6e665bnot sold yet|r")
           c[7]:SetTextColor(unpack(e.profit < 0 and COL.red or COL.green))
           c[8]:SetText(e.roi and string.format("%d%%", e.roi * 100 + 0.5) or "-")
         else
-          for k, cf in ipairs(c) do cf:SetText(i == 1 and k == 1 and #items == 0 and "|cff5f5f69No flips recorded yet.|r" or "") end
+          for k, cf in ipairs(c) do cf:SetText(i == 1 and k == 1 and #items == 0 and "|cff6e665bNo flips recorded yet.|r" or "") end
         end
       end
     else
@@ -402,11 +402,11 @@ FF.UI.RegisterPage("earnings", function(parent)
       for i, fs in ipairs(lines) do
         local e = rec[i]
         if e then
-          fs:SetText(string.format("|cff8e8e99%s|r   %s %s%s   %s", date("%d %b %H:%M", e.t),
+          fs:SetText(string.format("|cffa39a8c%s|r   %s %s%s   %s", date("%d %b %H:%M", e.t),
             e.kind == "sale" and "|cff4ade80Sold|r" or "|cfff87171Bought|r", e.name or "?", e.qty and e.qty > 1 and (" x" .. e.qty) or "",
             FF.Money(e.amount)))
         else
-          fs:SetText(i == 1 and "|cff5f5f69Nothing recorded yet.|r" or "")
+          fs:SetText(i == 1 and "|cff6e665bNothing recorded yet.|r" or "")
         end
       end
     end

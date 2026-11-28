@@ -361,7 +361,7 @@ FF.UI.RegisterPage("invest", function(parent)
   local BTN = 100
   local heads = {}
   for i, c in ipairs(COLS) do
-    local h = text(list, 10, COL.muted, nil, true); h:SetText(c[1]:upper()); h:SetJustifyH(c[3] or "RIGHT")
+    local h = text(list, 11, COL.muted, nil, true); h:SetText(c[1]); h:SetJustifyH(c[3] or "RIGHT")
     heads[i] = h
   end
   local scroll = CreateFrame("ScrollFrame", nil, list)
@@ -502,11 +502,11 @@ FF.UI.RegisterPage("invest", function(parent)
       local h = K.ROW_H
       if open then
         local parts = {}
-        table.insert(parts, string.format("|cfff2b81dPlan:|r buy %d up to %s each for %s, resell at %s each  ->  %s profit after %d%% AH cut and %s deposit",
+        table.insert(parts, string.format("|cffe8b13aPlan:|r buy %d up to %s each for %s, resell at %s each  ->  %s profit after %d%% AH cut and %s deposit",
           d.buy or 0, FF.Money(d.top), FF.Money(d.cost), FF.Money(d.target), FF.Money(d.profit),
           FF.Sniper.Cut() * 100, FF.Money(d.deposit)))
         if d.st and d.st.total > 0 then
-          table.insert(parts, "|cfff2b81dYour sell-through:|r " .. FF.Ledger.SellThroughText(d.st)
+          table.insert(parts, "|cffe8b13aYour sell-through:|r " .. FF.Ledger.SellThroughText(d.st)
             .. (d.sellThrough and "" or string.format("  (needs %d auctions to count)", FF.Ledger.MIN_AUCTIONS)))
         end
         table.insert(parts, string.format("Region average %s  ·  Market (recent) %s  ·  Your 7-day history %s  ·  On the AH %s%s",
@@ -518,11 +518,11 @@ FF.UI.RegisterPage("invest", function(parent)
           local sells = d.now or d.normal
           if cost and sells then
             local margin = sells * (1 - FF.Sniper.Cut()) - cost
-            table.insert(parts, string.format("|cfff2b81dCrafting:|r reagents %s, sells for %s  ->  %s%s|r per craft after AH cut",
+            table.insert(parts, string.format("|cffe8b13aCrafting:|r reagents %s, sells for %s  ->  %s%s|r per craft after AH cut",
               FF.Money(cost), FF.Money(sells), margin >= 0 and "|cff58c27d+" or "|cffe0605a-", FF.Money(math.abs(margin))))
           end
         end
-        if d.why then table.insert(parts, "|cff8e8e99" .. d.why .. (d.note and ("  " .. d.note) or "") .. "|r") end
+        if d.why then table.insert(parts, "|cffa39a8c" .. d.why .. (d.note and ("  " .. d.note) or "") .. "|r") end
         r.detail:ClearAllPoints(); r.detail:SetPoint("TOPLEFT", 44, -K.ROW_H); r.detail:SetWidth(width - 60)
         r.detail:SetText(table.concat(parts, "\n"))
         h = K.ROW_H + r.detail:GetStringHeight() + 10

@@ -161,7 +161,7 @@ FF.UI.RegisterPage("alerts", function(parent)
   local COLS = { { "Item", 0, "LEFT" }, { "Alert below", 96 }, { "Last seen", 96 }, { "Seen", 80 }, { "", 120, "LEFT" } }
   local heads = {}
   for i, c in ipairs(COLS) do
-    local h = text(list, 10, COL.muted, nil, true); h:SetText(c[1]:upper()); h:SetJustifyH(c[3] or "RIGHT"); heads[i] = h
+    local h = text(list, 11, COL.muted, nil, true); h:SetText(c[1]); h:SetJustifyH(c[3] or "RIGHT"); heads[i] = h
   end
   local scroll = CreateFrame("ScrollFrame", nil, list)
   scroll:SetPoint("TOPLEFT", 1, -30); scroll:SetPoint("BOTTOMRIGHT", -1, 4)
@@ -220,7 +220,7 @@ FF.UI.RegisterPage("alerts", function(parent)
       local below = w.seen and w.seen <= w.price
       local quality = select(3, C_Item.GetItemInfo(id))
       local vals = { FF.QualityColor(quality) .. itemName(id) .. "|r", FF.Money(w.price), w.seen and FF.Money(w.seen) or "-", ago(w.seenAt),
-                     below and "|cff4ade80Below your price!|r" or (w.seen and "|cff8e8e99Above|r" or "|cff5f5f69Not seen yet|r") }
+                     below and "|cff4ade80Below your price!|r" or (w.seen and "|cffa39a8cAbove|r" or "|cff6e665bNot seen yet|r") }
       for c, fs in ipairs(r.cells) do
         fs:ClearAllPoints(); fs:SetPoint("LEFT", cx[c].x + (c == 1 and 28 or 0) + (c == 5 and 10 or 0), 0)
         fs:SetWidth(cx[c].w - 6 - (c == 1 and 28 or 0)); fs:SetText(vals[c])

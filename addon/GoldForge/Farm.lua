@@ -461,7 +461,7 @@ local bar
 local function barText()
   if not S then return "Gold Guide: not farming" end
   local v = Farm.SessionValue(S)
-  return string.format("|cfff2b81dFarming|r %s  ·  %dm  ·  %d kills  ·  %s  ·  |cff58c27d%s/h|r",
+  return string.format("|cffe8b13aFarming|r %s  ·  %dm  ·  %d kills  ·  %s  ·  |cff58c27d%s/h|r",
     S.zone, S.active / 60, S.kills, FF.Money(v), FF.Money(Farm.PerHour(S, v)))
 end
 function Farm.RefreshBar()
@@ -555,7 +555,7 @@ FF.UI.RegisterPage("farm", function(parent)
   local heads = {}
   for i = 1, NC do
     local b = CreateFrame("Button", nil, list); b:SetHeight(16)
-    b.fs = text(b, 10, COL.muted, nil, true); b.fs:SetAllPoints()
+    b.fs = text(b, 11, COL.muted, nil, true); b.fs:SetAllPoints()
     b:SetScript("OnEnter", function(s) s.fs:SetTextColor(unpack(COL.gold)) end)
     b:SetScript("OnLeave", function(s) s.fs:SetTextColor(unpack(COL.muted)) end)
     b:SetScript("OnClick", function()
@@ -702,7 +702,7 @@ FF.UI.RegisterPage("farm", function(parent)
     for i, h in ipairs(heads) do
       h:ClearAllPoints(); h:SetPoint("TOPLEFT", cx[i].x + (i == 1 and 30 or 0), -10); h:SetWidth(cx[i].w - 6 - (i == 1 and 30 or 0))
       local arrow = (ss and ss.col == i) and (ss.desc and " v" or " ^") or ""
-      h.fs:SetText(cols[i][1]:upper() .. arrow); h.fs:SetJustifyH(cols[i][3] or "RIGHT")
+      h.fs:SetText(cols[i][1] .. arrow); h.fs:SetJustifyH(cols[i][3] or "RIGHT")
       h:EnableMouse(SORTKEYS[v][i] ~= nil)
     end
 
@@ -712,8 +712,8 @@ FF.UI.RegisterPage("farm", function(parent)
       if not applySort(v, data) then table.sort(data, function(a, b) return a.sortGph > b.sortGph end) end
       local sug, skill = Farm.Suggest()
       local today = FF.FarmRotation and FF.FarmRotation[tonumber(date("%w")) + 1]
-      hint:SetText((sug and ("|cfff2b81dFor you" .. (skill and (" (Skinning " .. skill .. ")") or " (no Skinning)") .. ":|r " .. sug.name .. "   ") or "")
-        .. (today and ("|cfff2b81dToday:|r " .. today) or ""))
+      hint:SetText((sug and ("|cffe8b13aFor you" .. (skill and (" (Skinning " .. skill .. ")") or " (no Skinning)") .. ":|r " .. sug.name .. "   ") or "")
+        .. (today and ("|cffe8b13aToday:|r " .. today) or ""))
     elseif v == "items" then
       data = Farm.ItemRows()
       if not applySort(v, data) then table.sort(data, function(a, b)
@@ -742,13 +742,13 @@ FF.UI.RegisterPage("farm", function(parent)
         local first = f.drops and f.drops[1] and f.drops[1][1]
         r.icon:SetTexture(first and C_Item.GetItemIconByID(first) or "Interface\\Icons\\INV_Misc_QuestionMark")
         local dead = f.status == "dead"
-        local est = d.live and (FF.Money(d.live) .. " |cff5f5f69live|r")
-          or (f.est and f.est[2] > 0 and string.format("%d-%dg |cff5f5f69notes|r", f.est[1], f.est[2]))
+        local est = d.live and (FF.Money(d.live) .. " |cff6e665blive|r")
+          or (f.est and f.est[2] > 0 and string.format("%d-%dg |cff6e665bnotes|r", f.est[1], f.est[2]))
           or (f.weekly and string.format("%dg/week", f.weekly)) or "-"
         vals = {
-          (dead and "|cffe0605a" or "|cffe6e6e6") .. f.name .. "|r" .. (dead and "  |cffe0605a[DEAD]|r" or ""),
+          (dead and "|cffe0605a" or "|cffede6da") .. f.name .. "|r" .. (dead and "  |cffe0605a[DEAD]|r" or ""),
           f.zone or "-",
-          f.cat .. (f.skill and string.format(" |cff8e8e99%d+|r", f.skill[1]) or (f.lvl and string.format(" |cff8e8e99Lv %d|r", f.lvl) or "")),
+          f.cat .. (f.skill and string.format(" |cffa39a8c%d+|r", f.skill[1]) or (f.lvl and string.format(" |cffa39a8cLv %d|r", f.lvl) or "")),
           dead and "|cffe0605a0|r" or est,
           d.mine and FF.Money(d.mine) or "-",
           d.mineHours and string.format("%.1fh", d.mineHours) or "-",
@@ -760,10 +760,10 @@ FF.UI.RegisterPage("farm", function(parent)
         if not name and C_Item.RequestLoadItemDataByID then C_Item.RequestLoadItemDataByID(d.itemID) end
         local quality = select(3, C_Item.GetItemInfo(d.itemID))
         vals = {
-          FF.QualityColor(quality) .. (name or ("Item " .. d.itemID)) .. "|r" .. (d.theme and "  |cfff2b81d[raid demand]|r" or ""),
-          (d.where or "-") .. (d.source and ("  |cff5f5f69" .. d.source .. "|r") or ""),
+          FF.QualityColor(quality) .. (name or ("Item " .. d.itemID)) .. "|r" .. (d.theme and "  |cffe8b13a[raid demand]|r" or ""),
+          (d.where or "-") .. (d.source and ("  |cff6e665b" .. d.source .. "|r") or ""),
           FF.Money(d.value), d.soldPerDay and string.format("%.0f", d.soldPerDay) or "-", pct(d.vs),
-          d.rate and string.format("%.1f/h", d.rate) or "|cff5f5f69not farmed|r",
+          d.rate and string.format("%.1f/h", d.rate) or "|cff6e665bnot farmed|r",
           d.gph and FF.Money(d.gph) or "-",
         }
       else
@@ -796,9 +796,9 @@ FF.UI.RegisterPage("farm", function(parent)
             table.insert(parts, string.format("%s %s%s", name, FF.Money(Farm.ItemValue(dr[1])),
               dr[2] and string.format(" (%.1f%%%s)", dr[2], dr[3] and string.format(", about %d each", dr[3]) or "") or ""))
           end
-          if #parts > 0 then table.insert(lines, "|cfff2b81dDrops:|r " .. table.concat(parts, ",  ")) end
-          if f.mobs then table.insert(lines, "|cfff2b81dMobs:|r " .. table.concat(f.mobs, ", ") .. (f.area and ("  ·  " .. f.area) or "")) end
-          if f.skill then table.insert(lines, string.format("|cfff2b81dSkinning:|r %d-%d", f.skill[1], f.skill[2])) end
+          if #parts > 0 then table.insert(lines, "|cffe8b13aDrops:|r " .. table.concat(parts, ",  ")) end
+          if f.mobs then table.insert(lines, "|cffe8b13aMobs:|r " .. table.concat(f.mobs, ", ") .. (f.area and ("  ·  " .. f.area) or "")) end
+          if f.skill then table.insert(lines, string.format("|cffe8b13aSkinning:|r %d-%d", f.skill[1], f.skill[2])) end
           if d.live then
             table.insert(lines, string.format("Live estimate: drop chance x %d kills/h x today's TSM price (drops with a known chance only; chances are Classic data from Wowhead/metabot, Forever may differ). Your notes said %s.",
               db().kph or 140, f.est and string.format("%d-%dg/h", f.est[1], f.est[2]) or "no estimate"))
@@ -810,24 +810,24 @@ FF.UI.RegisterPage("farm", function(parent)
           if f.route then
             local pts = {}
             for _, p in ipairs(f.route) do table.insert(pts, string.format("%s (%d, %d)", p[3], p[1], p[2])) end
-            table.insert(lines, "|cfff2b81dRoute:|r " .. table.concat(pts, " -> ") .. "   (Map pin button: next point)")
+            table.insert(lines, "|cffe8b13aRoute:|r " .. table.concat(pts, " -> ") .. "   (Map pin button: next point)")
           end
           local sm, sx, sy, how = Farm.Spot(f)
-          if sm then table.insert(lines, string.format("|cfff2b81dMap pin:|r (%.0f, %.0f), %s.", sx * 100, sy * 100, how)) end
-          if f.notes then table.insert(lines, "|cff8e8e99" .. f.notes .. "|r") end
+          if sm then table.insert(lines, string.format("|cffe8b13aMap pin:|r (%.0f, %.0f), %s.", sx * 100, sy * 100, how)) end
+          if f.notes then table.insert(lines, "|cffa39a8c" .. f.notes .. "|r") end
           if d.key == "ungoro_devilsaur" or d.key == "weekly_elven_curiosities" then
-            table.insert(lines, "|cff8e8e99Checks: " .. table.concat(FF.FarmReminders or {}, " · ") .. "|r")
+            table.insert(lines, "|cffa39a8cChecks: " .. table.concat(FF.FarmReminders or {}, " · ") .. "|r")
           end
         elseif v == "items" then
           if d.rate then
-            table.insert(lines, string.format("|cfff2b81dYour best:|r %.1f an hour in %s.", d.rate, d.rateZone))
+            table.insert(lines, string.format("|cffe8b13aYour best:|r %.1f an hour in %s.", d.rate, d.rateZone))
             if d.capped then
               table.insert(lines, string.format("|cffe0605aSells only %.0f a day in the region|r, so gold/hour counts at most that many per hour farmed.", d.soldPerDay))
             end
           else
             table.insert(lines, "Not farmed yet: farm it for 15 minutes and Gold Guide measures your real rate and gold/hour.")
           end
-          if d.theme then table.insert(lines, "|cfff2b81dRaid demand:|r " .. (FF.Invest.Timing(d.theme) or d.theme.name)) end
+          if d.theme then table.insert(lines, "|cffe8b13aRaid demand:|r " .. (FF.Invest.Timing(d.theme) or d.theme.name)) end
           if d.normal then table.insert(lines, "60-day normal price " .. FF.Money(d.normal) .. ", now " .. FF.Money(d.value) .. ".") end
         else
           local parts = {}
@@ -836,7 +836,7 @@ FF.UI.RegisterPage("farm", function(parent)
             table.insert(parts, string.format("%s x%d (%s)", C_Item.GetItemNameByID(t.id) or ("item " .. t.id), t.n, FF.Money(t.v)))
           end
           table.insert(lines, string.format("%d sessions · %d kills", d.sessions, d.kills))
-          table.insert(lines, "|cfff2b81dBest loot:|r " .. (#parts > 0 and table.concat(parts, ",  ") or "none"))
+          table.insert(lines, "|cffe8b13aBest loot:|r " .. (#parts > 0 and table.concat(parts, ",  ") or "none"))
         end
         r.detail:ClearAllPoints(); r.detail:SetPoint("TOPLEFT", 44, -K.ROW_H); r.detail:SetWidth(width - (v == "farms" and 160 or 60))
         r.detail:SetText(table.concat(lines, "\n"))
