@@ -114,6 +114,7 @@ FF:On("COMBAT_LOG_EVENT_UNFILTERED", function()
     local m = S.mobs[id] or { name = dstName, n = 0 }
     m.n = m.n + 1; S.mobs[id] = m
   end
+  Farm.CheckDead(dstName)
   FF:Fire("FF_FARM_CHANGED")
 end)
 
@@ -243,6 +244,135 @@ function Farm.ZoneRows()
   return out
 end
 
+-- ---------- farms (FarmData.lua) ----------
+local function lower(s) return (s or ""):lower() end
+local function mobMatches(f, mobName)
+  local n = lower(mobName)
+  for _, part in ipairs(f.mobs or {}) do if n:find(lower(part), 1, true) then return true end end
+  return false
+end
+
+-- killing mobs of a farm marked dead: warn once per session
+local warned = {}
+function Farm.CheckDead(mobName)
+  local zone = GetRealZoneText() or ""
+  for _, f in ipairs(FF.FarmData or {}) do
+    if f.status == "dead" and f.zone == zone and mobMatches(f, mobName) and not warned[f.id] then
+      warned[f.id] = true
+      local msg = "Gold Guide: " .. f.name .. " is a dead farm. " .. (f.notes or "")
+      if RaidNotice_AddMessage and RaidWarningFrame then RaidNotice_AddMessage(RaidWarningFrame, msg, ChatTypeInfo.RAID_WARNING) end
+      FF.Print(msg)
+    end
+  end
+end
+
+-- which farm a session was: the farm in that zone whose mobs you killed most
+function Farm.FarmOf(s)
+  local best, bestN = nil, 0
+  for _, f in ipairs(FF.FarmData or {}) do
+    if f.zone == s.zone and f.mobs then
+      local n = 0
+      for _, m in pairs(s.mobs or {}) do if mobMatches(f, m.name) then n = n + m.n end end
+      if n > bestN then best, bestN = f, n end
+    end
+  end
+  return best
+end
+
+-- live estimate from the drop chances: chance x kills/hour x today's price (only drops with a known chance)
+function Farm.Estimate(f)
+  local kph = db().kph or 140
+  local total, any = 0, false
+  for _, d in ipairs(f.drops or {}) do
+    if d[2] then total = total + d[2] / 100 * kph * Farm.ItemValue(d[1]); any = true end
+  end
+  return any and total or nil
+end
+
+-- your skinning skill, or nil if you don't have Skinning
+function Farm.SkinningSkill()
+  local ok, rank = pcall(function()
+    if GetProfessions then
+      for _, i in ipairs({ GetProfessions() }) do
+        local name, _, r, _, _, _, line = GetProfessionInfo(i)
+        if line == 393 or name == "Skinning" then return r end
+      end
+    end
+    if GetNumSkillLines then
+      for i = 1, GetNumSkillLines() do
+        local name, header, _, r = GetSkillLineInfo(i)
+        if not header and name == "Skinning" then return r end
+      end
+    end
+  end)
+  return ok and rank or nil
+end
+
+function Farm.Get(id) for _, f in ipairs(FF.FarmData or {}) do if f.id == id then return f end end end
+
+-- the farm your notes recommend for your skinning skill
+function Farm.Suggest()
+  local skill = Farm.SkinningSkill()
+  if not skill then return Farm.Get(FF.FarmNoSkinning), nil end
+  for _, s in ipairs(FF.FarmSkinning or {}) do
+    if skill >= s[1] and skill <= s[2] then return Farm.Get(s[3]), skill end
+  end
+end
+
+function Farm.FarmRows()
+  local measured = {}
+  for _, s in ipairs(db().sessions) do
+    local f = Farm.FarmOf(s)
+    if f then
+      local m = measured[f.id] or { active = 0, value = 0, n = 0, kills = 0 }
+      m.active, m.value, m.n, m.kills = m.active + s.active, m.value + Farm.SessionValue(s), m.n + 1, m.kills + s.kills
+      measured[f.id] = m
+    end
+  end
+  local out = {}
+  for _, f in ipairs(FF.FarmData or {}) do
+    local r = { farm = f, key = f.id, live = Farm.Estimate(f) }
+    local m = measured[f.id]
+    if m and m.active > 0 then
+      r.mine, r.mineHours, r.mineKph = m.value * 3600 / m.active, m.active / 3600, m.kills * 3600 / m.active
+    end
+    r.sortGph = (f.status == "dead") and -1 or (r.mine and r.mineHours >= MIN_HOURS and r.mine)
+      or r.live or (f.est and (f.est[1] + f.est[2]) / 2 * 10000) or 0
+    table.insert(out, r)
+  end
+  return out
+end
+
+-- map pin for a farm's route: each click moves the pin to the next point (TomTom gets all of them)
+local mapCache = {}
+local function mapIDFor(zone)
+  if mapCache[zone] ~= nil then return mapCache[zone] or nil end
+  local here = C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
+  local info = here and C_Map.GetMapInfo(here)
+  if info and info.name == zone then mapCache[zone] = here; return here end
+  for id = 1, 2500 do
+    local i = C_Map.GetMapInfo(id)
+    if i and i.name == zone and (not Enum.UIMapType or i.mapType == Enum.UIMapType.Zone) then mapCache[zone] = id; return id end
+  end
+  mapCache[zone] = false
+end
+function Farm.PinNext(f)
+  if not f.route then return end
+  local m = mapIDFor(f.zone)
+  if not m then FF.Kit.status("Couldn't find " .. f.zone .. " on the map."); return end
+  if TomTom and TomTom.AddWaypoint and not f.tomtom then
+    for _, p in ipairs(f.route) do TomTom:AddWaypoint(m, p[1] / 100, p[2] / 100, { title = f.name .. ": " .. p[3] }) end
+    f.tomtom = true
+  end
+  f.pinIdx = (f.pinIdx or 0) % #f.route + 1
+  local p = f.route[f.pinIdx]
+  if C_Map.SetUserWaypoint and UiMapPoint then
+    C_Map.SetUserWaypoint(UiMapPoint.CreateFromCoordinates(m, p[1] / 100, p[2] / 100))
+    if C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint then C_SuperTrack.SetSuperTrackedUserWaypoint(true) end
+  end
+  FF.Kit.status(string.format("Map pin %d/%d: %s (%d, %d). Click again for the next point.", f.pinIdx, #f.route, p[3], p[1], p[2]))
+end
+
 -- ---------- the small farming bar ----------
 local bar
 local function barText()
@@ -279,7 +409,8 @@ FF:On("PLAYER_LOGIN", function()
   local d = db()
   if d.auto == nil then d.auto = true end
   if d.showBar == nil then d.showBar = true end
-  d.view = d.view or "items"
+  d.view = d.view or "farms"
+  d.kph = d.kph or 140
 end)
 
 -- ---------- page ----------
@@ -309,18 +440,27 @@ FF.UI.RegisterPage("farm", function(parent)
   -- view picker
   local ctl = box(page, COL.card, COL.line)
   ctl:SetPoint("TOPLEFT", card, "BOTTOMLEFT", 0, -10); ctl:SetPoint("RIGHT", -20, 0); ctl:SetHeight(48)
-  local view = K.dropdown(ctl, 240,
-    function() return { { text = "What to farm", value = "items" }, { text = "Your farming by zone", value = "zones" } } end,
-    function() return db().view == "zones" and "Your farming by zone" or "What to farm" end, nil,
+  local VIEWNAMES = { farms = "Farms", items = "Items worth farming", zones = "Your farming by zone" }
+  local view = K.dropdown(ctl, 200,
+    function() return { { text = VIEWNAMES.farms, value = "farms" }, { text = VIEWNAMES.items, value = "items" }, { text = VIEWNAMES.zones, value = "zones" } } end,
+    function() return VIEWNAMES[db().view] or VIEWNAMES.farms end, nil,
     function(v) db().view = v; page:Refresh() end)
   view:SetPoint("LEFT", 14, 0)
-  local hint = text(ctl, 10, COL.dim); hint:SetPoint("LEFT", view, "RIGHT", 14, 0); hint:SetPoint("RIGHT", -14, 0)
+  local kph = K.dropdown(ctl, 150,
+    function() local o = {} for _, n in ipairs({ 80, 110, 140, 170, 200 }) do table.insert(o, { text = "Estimate at " .. n .. " kills/h", value = n }) end return o end,
+    function() return (db().kph or 140) .. " kills/h" end, nil,
+    function(v) db().kph = v; page:Refresh() end)
+  kph:SetPoint("LEFT", view, "RIGHT", 10, 0)
+  local hint = text(ctl, 10, COL.dim); hint:SetPoint("LEFT", kph, "RIGHT", 14, 0); hint:SetPoint("RIGHT", -14, 0)
+  hint:SetWordWrap(true); hint:SetMaxLines(2)
   hint:SetJustifyH("LEFT")
 
   -- table
   local list = box(page, COL.card, COL.line)
   list:SetPoint("TOPLEFT", ctl, "BOTTOMLEFT", 0, -10); list:SetPoint("BOTTOMRIGHT", -20, 34)
   local VIEWS = {
+    farms = { { "Farm", 0, "LEFT" }, { "Zone", 140, "LEFT" }, { "Type", 112, "LEFT" }, { "Estimate g/h", 92 },
+              { "Your g/h", 84 }, { "Farmed", 62 }, { "", 96 } },
     items = { { "Item", 0, "LEFT" }, { "Where", 220, "LEFT" }, { "Value", 80 }, { "Sold/day", 60 }, { "Vs 60-day", 66 },
               { "Your rate", 72 }, { "Gold/hour", 90 } },
     zones = { { "Zone", 0, "LEFT" }, { "Last farmed", 100, "LEFT" }, { "Time", 64 }, { "Kills/hour", 76 }, { "Total value", 100 },
@@ -364,16 +504,26 @@ FF.UI.RegisterPage("farm", function(parent)
     r.cells = {}
     for c = 1, NC do r.cells[c] = text(r, 12, COL.text, nil, c == NC) end
     r.detail = text(r, 11, COL.muted, nil, false); r.detail:SetJustifyH("LEFT"); r.detail:SetWordWrap(true)
+    r.pin = button(r, "Map pin", 84, 22, "ghost", function() if r.data and r.data.farm then Farm.PinNext(r.data.farm) end end)
+    r.pin:SetPoint("TOPRIGHT", -12, -4)
     r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     r:SetScript("OnClick", function(s, mouse)
       local d = s.data
       if mouse == "RightButton" and d.itemID then FF.History.Open(d.itemID); return end
-      local key = d.itemID or d.zone
+      local key = d.key or d.itemID or d.zone
       expanded[key] = not expanded[key]; page:Refresh()
     end)
     r:SetScript("OnEnter", function(s)
       s.hl:Show()
       local d = s.data
+      if d.farm then
+        local f = d.farm
+        GameTooltip:SetOwner(s, "ANCHOR_RIGHT"); GameTooltip:SetText(f.name, 1, 1, 1)
+        GameTooltip:AddLine((f.zone or "") .. (f.area and (" · " .. f.area) or ""), 0.8, 0.8, 0.85, true)
+        if f.notes then GameTooltip:AddLine(f.notes, 0.95, 0.72, 0.11, true) end
+        GameTooltip:AddLine("Click: drops and details", 0.56, 0.56, 0.6); GameTooltip:Show()
+        return
+      end
       if not d.itemID then return end
       GameTooltip:SetOwner(s, "ANCHOR_RIGHT"); GameTooltip:SetItemByID(d.itemID)
       if d.source then GameTooltip:AddLine(d.source .. " · " .. (d.where or ""), 0.8, 0.8, 0.85, true) end
@@ -386,7 +536,7 @@ FF.UI.RegisterPage("farm", function(parent)
 
   function page:Refresh()
     if page:GetWidth() < 10 then return end
-    view:Refresh(); barBox:Refresh(); autoBox:Refresh()
+    view:Refresh(); kph:Refresh(); barBox:Refresh(); autoBox:Refresh()
     -- live card
     local s = Farm.Current()
     if s then
@@ -402,7 +552,7 @@ FF.UI.RegisterPage("farm", function(parent)
       startBtn:SetLabel("Start"); startBtn:SetStyle("primary")
     end
 
-    local v = db().view == "zones" and "zones" or "items"
+    local v = VIEWS[db().view] and db().view or "farms"
     local cols = VIEWS[v]
     local width = scroll:GetWidth()
     local cx = colX(cols, width)
@@ -412,7 +562,14 @@ FF.UI.RegisterPage("farm", function(parent)
     end
 
     local data
-    if v == "items" then
+    if v == "farms" then
+      data = Farm.FarmRows()
+      table.sort(data, function(a, b) return a.sortGph > b.sortGph end)
+      local sug, skill = Farm.Suggest()
+      local today = FF.FarmRotation and FF.FarmRotation[tonumber(date("%w")) + 1]
+      hint:SetText((sug and ("|cfff2b81dFor you" .. (skill and (" (Skinning " .. skill .. ")") or " (no Skinning)") .. ":|r " .. sug.name .. "   ") or "")
+        .. (today and ("|cfff2b81dToday:|r " .. today) or ""))
+    elseif v == "items" then
       data = Farm.ItemRows()
       table.sort(data, function(a, b)
         if (a.gph ~= nil) ~= (b.gph ~= nil) then return a.gph ~= nil end
@@ -431,7 +588,26 @@ FF.UI.RegisterPage("farm", function(parent)
       r.data = d
       r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y); r:SetPoint("RIGHT", content, "RIGHT")
       local vals
-      if v == "items" then
+      r.pin:SetShown(v == "farms" and d.farm and d.farm.route ~= nil)
+      if v == "farms" then
+        local f = d.farm
+        r.icon:Show()
+        local first = f.drops and f.drops[1] and f.drops[1][1]
+        r.icon:SetTexture(first and C_Item.GetItemIconByID(first) or "Interface\\Icons\\INV_Misc_QuestionMark")
+        local dead = f.status == "dead"
+        local est = d.live and (FF.Money(d.live) .. " |cff5f5f69live|r")
+          or (f.est and f.est[2] > 0 and string.format("%d-%dg |cff5f5f69notes|r", f.est[1], f.est[2]))
+          or (f.weekly and string.format("%dg/week", f.weekly)) or "-"
+        vals = {
+          (dead and "|cffe0605a" or "|cffe6e6e6") .. f.name .. "|r" .. (dead and "  |cffe0605a[DEAD]|r" or ""),
+          f.zone or "-",
+          f.cat .. (f.skill and string.format(" |cff8e8e99%d+|r", f.skill[1]) or ""),
+          dead and "|cffe0605a0|r" or est,
+          d.mine and FF.Money(d.mine) or "-",
+          d.mineHours and string.format("%.1fh", d.mineHours) or "-",
+          "",
+        }
+      elseif v == "items" then
         r.icon:SetTexture(C_Item.GetItemIconByID(d.itemID)); r.icon:Show()
         local name = C_Item.GetItemNameByID(d.itemID)
         if not name and C_Item.RequestLoadItemDataByID then C_Item.RequestLoadItemDataByID(d.itemID) end
@@ -451,20 +627,48 @@ FF.UI.RegisterPage("farm", function(parent)
         }
       end
       for c, fs in ipairs(r.cells) do
-        local off = (c == 1 and v == "items") and 30 or (c == 1 and 0 or 0)
+        local off = (c == 1 and v ~= "zones") and 30 or 0
         fs:ClearAllPoints(); fs:SetPoint("TOPLEFT", cx[c].x + off, 0)
         fs:SetSize(cx[c].w - 6 - off, K.ROW_H); fs:SetJustifyH(cols[c][3] or "RIGHT"); fs:SetText(vals[c] or "")
-        fs:SetTextColor(unpack(c == NC and COL.green or COL.text))
+        local green = (v == "farms" and c == 5) or (v ~= "farms" and c == NC)
+        fs:SetTextColor(unpack(green and COL.green or COL.text))
       end
       if v == "items" and d.vs then r.cells[5]:SetTextColor(unpack(d.vs < 0 and COL.muted or COL.green)) end
 
-      local key = d.itemID or d.zone
+      local key = d.key or d.itemID or d.zone
       local open = expanded[key]
       r.detail:SetShown(open)
       local h = K.ROW_H
       if open then
         local lines = {}
-        if v == "items" then
+        if v == "farms" then
+          local f = d.farm
+          local parts = {}
+          for _, dr in ipairs(f.drops or {}) do
+            local name = C_Item.GetItemNameByID(dr[1]) or ("item " .. dr[1])
+            table.insert(parts, string.format("%s %s%s", name, FF.Money(Farm.ItemValue(dr[1])), dr[2] and string.format(" (%.1f%%)", dr[2]) or ""))
+          end
+          if #parts > 0 then table.insert(lines, "|cfff2b81dDrops:|r " .. table.concat(parts, ",  ")) end
+          if f.mobs then table.insert(lines, "|cfff2b81dMobs:|r " .. table.concat(f.mobs, ", ") .. (f.area and ("  ·  " .. f.area) or "")) end
+          if f.skill then table.insert(lines, string.format("|cfff2b81dSkinning:|r %d-%d", f.skill[1], f.skill[2])) end
+          if d.live then
+            table.insert(lines, string.format("Live estimate: drop chance x %d kills/h x today's TSM price (drops with a known chance only). Your notes said %s.",
+              db().kph or 140, f.est and string.format("%d-%dg/h", f.est[1], f.est[2]) or "no estimate"))
+          end
+          if d.mine then
+            table.insert(lines, string.format("|cff58c27dYou:|r %s/h over %.1f hours, %d kills/h%s.", FF.Money(d.mine), d.mineHours, d.mineKph,
+              d.mineHours < MIN_HOURS and " (under 15 min: not trusted yet)" or ""))
+          end
+          if f.route then
+            local pts = {}
+            for _, p in ipairs(f.route) do table.insert(pts, string.format("%s (%d, %d)", p[3], p[1], p[2])) end
+            table.insert(lines, "|cfff2b81dRoute:|r " .. table.concat(pts, " -> ") .. "   (Map pin button: next point)")
+          end
+          if f.notes then table.insert(lines, "|cff8e8e99" .. f.notes .. "|r") end
+          if d.key == "ungoro_devilsaur" or d.key == "weekly_elven_curiosities" then
+            table.insert(lines, "|cff8e8e99Checks: " .. table.concat(FF.FarmReminders or {}, " · ") .. "|r")
+          end
+        elseif v == "items" then
           if d.rate then
             table.insert(lines, string.format("|cfff2b81dYour best:|r %.1f an hour in %s.", d.rate, d.rateZone))
             if d.capped then

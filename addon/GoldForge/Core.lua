@@ -1,7 +1,7 @@
 -- Gold Forge: core. Settings, events, money formatting, logging and slash commands.
 local ADDON, FF = ...
 _G.GoldForge = FF
-FF.version = "0.9.0"
+FF.version = "0.9.1"
 
 -- Settings. Money is in copper (1g = 10000), percentages are whole numbers.
 local DEFAULTS = {
