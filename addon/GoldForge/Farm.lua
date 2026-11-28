@@ -550,8 +550,54 @@ FF.UI.RegisterPage("farm", function(parent)
               { "Raw gold", 84 }, { "Gold/hour", 90 } },
   }
   local NC = 7
+  -- clickable column headers: click to sort, click again to flip the order
+  local function sortState(v) db().sort = db().sort or {}; return db().sort[v] end
   local heads = {}
-  for i = 1, NC do heads[i] = text(list, 10, COL.muted, nil, true) end
+  for i = 1, NC do
+    local b = CreateFrame("Button", nil, list); b:SetHeight(16)
+    b.fs = text(b, 10, COL.muted, nil, true); b.fs:SetAllPoints()
+    b:SetScript("OnEnter", function(s) s.fs:SetTextColor(unpack(COL.gold)) end)
+    b:SetScript("OnLeave", function(s) s.fs:SetTextColor(unpack(COL.muted)) end)
+    b:SetScript("OnClick", function()
+      local v = VIEWS[db().view] and db().view or "farms"
+      local s = sortState(v)
+      if s and s.col == i then s.desc = not s.desc
+      else db().sort[v] = { col = i, desc = i > 2 } end   -- names A-Z first, numbers highest first
+      page:Refresh()
+    end)
+    heads[i] = b
+  end
+  -- what each column sorts by (nil values always go last)
+  local function iname(d) return C_Item.GetItemNameByID(d.itemID) or "" end
+  local SORTKEYS = {
+    farms = {
+      function(d) return d.farm.name end, function(d) return d.farm.zone or "" end,
+      function(d) return d.farm.skill and d.farm.skill[1] or d.farm.lvl end,
+      function(d) if d.farm.status == "dead" then return -1 end
+        return d.live or (d.farm.est and d.farm.est[2] > 0 and (d.farm.est[1] + d.farm.est[2]) / 2 * 10000) or nil end,
+      function(d) return d.mine end, function(d) return d.mineHours end, nil,
+    },
+    items = {
+      iname, function(d) return d.where or "" end, function(d) return d.value end, function(d) return d.soldPerDay end,
+      function(d) return d.vs end, function(d) return d.rate end, function(d) return d.gph end,
+    },
+    zones = {
+      function(d) return d.zone end, function(d) return d.last end, function(d) return d.active end, function(d) return d.kph end,
+      function(d) return d.value end, function(d) return d.money end, function(d) return d.gph end,
+    },
+  }
+  local function applySort(v, data)
+    local s = sortState(v)
+    local key = s and SORTKEYS[v][s.col]
+    if not key then return false end
+    table.sort(data, function(a, b)
+      local ka, kb = key(a), key(b)
+      if ka == nil or kb == nil then return ka ~= nil end
+      if ka == kb then return false end
+      if s.desc then return ka > kb else return ka < kb end
+    end)
+    return true
+  end
   local scroll = CreateFrame("ScrollFrame", nil, list)
   scroll:SetPoint("TOPLEFT", 1, -30); scroll:SetPoint("BOTTOMRIGHT", -1, 4)
   local content = CreateFrame("Frame", nil, scroll); content:SetSize(1, 1)
@@ -652,29 +698,33 @@ FF.UI.RegisterPage("farm", function(parent)
     local cols = VIEWS[v]
     local width = scroll:GetWidth()
     local cx = colX(cols, width)
+    local ss = sortState(v)
     for i, h in ipairs(heads) do
-      h:ClearAllPoints(); h:SetPoint("TOPLEFT", cx[i].x + (i == 1 and 30 or 0), -12); h:SetWidth(cx[i].w - 6 - (i == 1 and 30 or 0))
-      h:SetText(cols[i][1]:upper()); h:SetJustifyH(cols[i][3] or "RIGHT")
+      h:ClearAllPoints(); h:SetPoint("TOPLEFT", cx[i].x + (i == 1 and 30 or 0), -10); h:SetWidth(cx[i].w - 6 - (i == 1 and 30 or 0))
+      local arrow = (ss and ss.col == i) and (ss.desc and " v" or " ^") or ""
+      h.fs:SetText(cols[i][1]:upper() .. arrow); h.fs:SetJustifyH(cols[i][3] or "RIGHT")
+      h:EnableMouse(SORTKEYS[v][i] ~= nil)
     end
 
     local data
     if v == "farms" then
       data = Farm.FarmRows()
-      table.sort(data, function(a, b) return a.sortGph > b.sortGph end)
+      if not applySort(v, data) then table.sort(data, function(a, b) return a.sortGph > b.sortGph end) end
       local sug, skill = Farm.Suggest()
       local today = FF.FarmRotation and FF.FarmRotation[tonumber(date("%w")) + 1]
       hint:SetText((sug and ("|cfff2b81dFor you" .. (skill and (" (Skinning " .. skill .. ")") or " (no Skinning)") .. ":|r " .. sug.name .. "   ") or "")
         .. (today and ("|cfff2b81dToday:|r " .. today) or ""))
     elseif v == "items" then
       data = Farm.ItemRows()
-      table.sort(data, function(a, b)
+      if not applySort(v, data) then table.sort(data, function(a, b)
         if (a.gph ~= nil) ~= (b.gph ~= nil) then return a.gph ~= nil end
         if a.gph then return a.gph > b.gph end
         return (a.value or 0) * math.min(a.soldPerDay or 0, 50) > (b.value or 0) * math.min(b.soldPerDay or 0, 50)
-      end)
+      end) end
       hint:SetText("Gold/hour shows after 15 minutes of farming an item's zone. Until then, sorted by value and how well it sells.")
     else
       data = Farm.ZoneRows()
+      applySort(v, data)
       hint:SetText("Every zone you've farmed, best gold/hour first. Values use today's prices.")
     end
 
