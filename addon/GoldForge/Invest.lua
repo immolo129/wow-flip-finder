@@ -34,7 +34,7 @@ Invest.Themes = {
     why = "Raiders stock up on flasks, potions, protection potions and food in the days before a new raid opens.",
     items = {
       { 13510 }, { 13511 }, { 13512 }, { 13513 }, { 13444 }, { 13446 }, { 13452 }, { 9206 }, { 13454 },
-      { 13457, "Fire protection" }, { 13456, "Frost protection" }, { 13458, "Nature protection" }, { 13459, "Shadow protection" },
+      { 13457, "Fire protection: Onyxia's fight is fire-based" }, { 6049, "Fire protection (cheaper): Onyxia's fight is fire-based" }, { 13456, "Frost protection" }, { 13458, "Nature protection" }, { 13459, "Shadow protection" },
       { 3387 }, { 9088 }, { 12820 }, { 20452 }, { 12404 }, { 13468, "Black Market NPC caps it at 50g" }, { 8846 },
     } },
   { key = "food", name = "Raid food (new +20 stat foods)",

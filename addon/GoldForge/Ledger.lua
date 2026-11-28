@@ -9,7 +9,7 @@ local DAY = 86400
 
 local function db()
   local l = FF.db.ledger
-  l.buys, l.sales, l.seen = l.buys or {}, l.sales or {}, l.seen or {}
+  l.buys, l.sales, l.seen, l.expired = l.buys or {}, l.sales or {}, l.seen or {}, l.expired or {}
   return l
 end
 
@@ -27,7 +27,23 @@ local function scanMail()
   local l, now, added = db(), time(), 0
   for i = 1, GetInboxNumItems() do
     local invoiceType, itemName, _, bid, _, _, consignment = GetInboxInvoiceInfo(i)
-    if invoiceType == "seller" and itemName then
+    if not invoiceType then
+      -- "Auction expired: X" mails: the auction didn't sell and its deposit is gone
+      local _, _, _, subject, _, _, daysLeft = GetInboxHeaderInfo(i)
+      local pat = AUCTION_EXPIRED_MAIL_SUBJECT and ("^" .. AUCTION_EXPIRED_MAIL_SUBJECT:gsub("[%-%.%?%[%]%(%)%+%*%^%$]", "%%%0"):gsub("%%s", "(.+)") .. "$")
+      local name = pat and subject and subject:match(pat)
+      if name then
+        local qty = tonumber(name:match("%((%d+)%)$")) or 1
+        name = name:gsub("%s*%(%d+%)$", "")
+        local arrived = now - math.floor((30 - (daysLeft or 30)) * DAY)
+        local key = "x:" .. name .. ":" .. qty .. ":" .. math.floor(arrived / 900)
+        if not l.seen[key] then
+          l.seen[key] = arrived
+          table.insert(l.expired, { t = arrived, name = name, qty = qty })
+          added = added + 1
+        end
+      end
+    elseif invoiceType == "seller" and itemName then
       local _, _, _, subject, money, _, daysLeft = GetInboxHeaderInfo(i)
       -- auction mails last 30 days, so this is when it arrived (to the minute or so)
       local arrived = now - math.floor((30 - (daysLeft or 30)) * DAY)
@@ -93,6 +109,10 @@ function Ledger.ByItem()
   for _, s in ipairs(l.sales) do
     local e = by[s.name]
     if e then e.sold, e.earned, e.sales = e.sold + (s.qty or 1), e.earned + (s.money or 0), e.sales + 1 end
+  end
+  for _, x in ipairs(l.expired) do
+    local e = by[x.name]
+    if e then e.expired = (e.expired or 0) + 1 end
   end
   local out = {}
   for _, e in pairs(by) do
@@ -269,7 +289,7 @@ FF.UI.RegisterPage("earnings", function(parent)
   end
   local note = text(recent, 10, COL.dim); note:SetPoint("TOPRIGHT", -14, -14)
   -- columns for "By item"
-  local ICOLS = { { "Item", 0, "LEFT" }, { "Bought", 60 }, { "Sold", 50 }, { "Avg cost", 84 }, { "Spent", 84 }, { "Earned", 84 }, { "Profit", 84 }, { "ROI", 50 } }
+  local ICOLS = { { "Item", 0, "LEFT" }, { "Bought", 60 }, { "Sold", 96 }, { "Avg cost", 84 }, { "Spent", 84 }, { "Earned", 84 }, { "Profit", 84 }, { "ROI", 50 } }
   local heads = {}
   for i, c in ipairs(ICOLS) do
     local h = text(recent, 10, COL.muted, nil, true); h:SetJustifyH(c[3] or "RIGHT"); h:SetText(c[1]:upper())
@@ -327,13 +347,15 @@ FF.UI.RegisterPage("earnings", function(parent)
     if byItem then
       layoutItemCols()
       local items = Ledger.ByItem()
-      note:SetText(#items > 0 and string.format("All time · %d items · sales matched to purchases by name", #items) or "")
+      note:SetText(#items > 0 and string.format("All time · %d items · sales matched to purchases by name · %d expired auctions (deposit lost)",
+        #items, #db().expired) or "")
       for i = 1, NLINES do
         local e, c = items[i], cells[i]
         if e then
           c[1]:SetText(e.name)
           c[2]:SetText(tostring(e.bought))
-          c[3]:SetText(e.sold > 0 and tostring(e.sold) or "|cff5f5f69-|r")
+          c[3]:SetText((e.sold > 0 and tostring(e.sold) or "|cff5f5f69-|r")
+            .. ((e.expired or 0) > 0 and string.format(" |cffe0605a(%d exp.)|r", e.expired) or ""))
           c[4]:SetText(FF.Money(e.avg))
           c[5]:SetText(FF.Money(e.cost))
           c[6]:SetText(e.earned > 0 and FF.Money(e.earned) or "|cff5f5f69-|r")
