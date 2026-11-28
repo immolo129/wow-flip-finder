@@ -616,6 +616,7 @@ FF.UI.RegisterPage("farm", function(parent)
         end
         if f.skill then GameTooltip:AddLine(string.format("Skinning %d-%d", f.skill[1], f.skill[2]), 0.8, 0.8, 0.85) end
         if f.notes then GameTooltip:AddLine(f.notes, 0.95, 0.72, 0.11, true) end
+        if f.source == "guide" then GameTooltip:AddLine("From your gold guide", 0.56, 0.56, 0.6) end
         GameTooltip:AddLine("Click: details · Map pin: show it on the map", 0.56, 0.56, 0.6); GameTooltip:Show()
         return
       end
@@ -697,7 +698,7 @@ FF.UI.RegisterPage("farm", function(parent)
         vals = {
           (dead and "|cffe0605a" or "|cffe6e6e6") .. f.name .. "|r" .. (dead and "  |cffe0605a[DEAD]|r" or ""),
           f.zone or "-",
-          f.cat .. (f.skill and string.format(" |cff8e8e99%d+|r", f.skill[1]) or ""),
+          f.cat .. (f.skill and string.format(" |cff8e8e99%d+|r", f.skill[1]) or (f.lvl and string.format(" |cff8e8e99Lv %d|r", f.lvl) or "")),
           dead and "|cffe0605a0|r" or est,
           d.mine and FF.Money(d.mine) or "-",
           d.mineHours and string.format("%.1fh", d.mineHours) or "-",

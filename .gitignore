@@ -4,3 +4,5 @@
 *.db-*
 __pycache__/
 site/
+# farms from the user's purchased gold guide: personal use only, never published
+addon/GoldForge/FarmDataGuide.lua
