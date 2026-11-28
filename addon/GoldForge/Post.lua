@@ -145,8 +145,7 @@ function Post.Scan()
       r.price, r.note = Post.Price(r, ladder)
       local rate, st = FF.Ledger.SellThrough(r.name)
       if rate and r.price then
-        r.why = (r.why or "") .. "
-Your auctions of this: " .. FF.Ledger.SellThroughText(st) .. "."
+        r.why = (r.why or "") .. "\nYour auctions of this: " .. FF.Ledger.SellThroughText(st) .. "."
         if rate < 0.5 then
           r.note = r.note .. " · usually expires"
           r.why = r.why .. " It often expires for you: a shorter duration or a lower price may sell better."
