@@ -10,6 +10,22 @@ local TIMEOUT = 8       -- seconds to wait for an answer before retrying
 local MAX_TRIES = 2     -- send a query at most twice before skipping it
 local STALL_LIMIT = 4   -- this many skipped queries in a row: the AH stopped answering, give up
 local unanswered = 0
+local MAX_WAIT = 4      -- seconds to wait for Blizzard's "ready for the next query" flag before sending anyway
+local waitSince = nil   -- when the current wait for that flag started
+
+-- true when a query may go out now: the AH says it's ready, or we've waited MAX_WAIT seconds
+-- (the flag can get stuck after a long scan; then the query goes anyway and the drop/timeout
+-- handling below takes over, instead of the scan hanging until the AH is reopened)
+local function mayAsk()
+  if AH.IsThrottledMessageSystemReady() then waitSince = nil; return true end
+  waitSince = waitSince or GetTime()
+  if GetTime() - waitSince >= MAX_WAIT then
+    FF.Log(string.format("AH busy flag stuck for %ds: sending anyway", MAX_WAIT))
+    waitSince = nil
+    return true
+  end
+  return false
+end
 local PRICE_SORT = { { sortOrder = Enum.AuctionHouseSortOrder.Price, reverseSort = false } }
 
 local function isOpen()
@@ -40,7 +56,7 @@ end
 function Scan.Next()
   if job or #queue == 0 then return end
   if not isOpen() then queue = {}; return end
-  if not AH.IsThrottledMessageSystemReady() then
+  if not mayAsk() then
     C_Timer.After(0.2, Scan.Next)  -- also woken by AUCTION_HOUSE_THROTTLED_SYSTEM_READY
     return
   end
@@ -60,7 +76,7 @@ end
 function Scan.Resend()
   local j = job
   if not j then return end
-  if not AH.IsThrottledMessageSystemReady() then
+  if not mayAsk() then
     C_Timer.After(0.2, function() if job == j then Scan.Resend() end end)
     return
   end
@@ -93,6 +109,9 @@ end
 
 function Scan.Send(j)
   j.tries = (j.tries or 0) + 1
+  if j.kind == "browse" or j.kind == "owned" or j.tries > 1 then   -- not every price check: the log would fill up
+    FF.Log(string.format("scan: ask %s%s%s", j.kind, j.itemID and (" " .. j.itemID) or "", j.tries > 1 and (" (try " .. j.tries .. ")") or ""))
+  end
   arm(j)
   if job.kind == "browse" then
     job.results = {}
@@ -114,6 +133,7 @@ end
 function Scan.Clear()
   queue = {}
   job = nil
+  waitSince = nil
 end
 
 function Scan.Busy()
@@ -150,6 +170,7 @@ end
 -- ---------- answers ----------
 local function browseDone()
   local res = AH.GetBrowseResults() or {}
+  FF.Log("scan: browse answered, " .. #res .. " items")
   finish(res)
 end
 

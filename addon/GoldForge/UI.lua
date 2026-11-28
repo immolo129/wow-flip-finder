@@ -983,6 +983,7 @@ end
 -- window stays open but invisible underneath (closing it would close the auction house). Only the
 -- look changes; buying, posting and cancelling still go through the player's own clicks.
 local docked = false
+local blizzardThisVisit = false   -- "Blizzard AH" pressed: Blizzard's window until the AH is closed
 function UI.IsDocked() return docked end
 local function ahOpen() return AuctionHouseFrame and AuctionHouseFrame:IsShown() end
 
@@ -990,7 +991,7 @@ function UI.Dock()
   if not frame then build() end
   if not ahOpen() then return UI.Show() end
   docked = true
-  FF.db.replaceAH = true
+  blizzardThisVisit = false
   AuctionHouseFrame:SetAlpha(0)
   frame:ClearAllPoints()
   frame:SetPoint("TOPLEFT", AuctionHouseFrame, "TOPLEFT", 0, 0)
@@ -1003,7 +1004,7 @@ end
 -- back to Blizzard's own auction house window
 function UI.Undock()
   docked = false
-  FF.db.replaceAH = false
+  blizzardThisVisit = true
   if AuctionHouseFrame then AuctionHouseFrame:SetAlpha(1) end
   if UI.ahButton then UI.ahButton:Show() end
   if frame then
@@ -1016,7 +1017,7 @@ end
 -- outside the auction house (/gf): a normal movable window
 function UI.Show()
   if not frame then build() end
-  if ahOpen() and FF.db.replaceAH ~= false then return UI.Dock() end
+  if ahOpen() and not blizzardThisVisit then return UI.Dock() end
   frame:SetFrameStrata("HIGH")
   frame.blizz:SetShown(ahOpen() and true or false)
   if ahOpen() then
@@ -1074,11 +1075,10 @@ end
 
 function UI.OnAuctionHouseShown()
   if not ahOpen() then return end
-  if FF.db.replaceAH ~= false then
-    UI.Dock()
-  else
+  if blizzardThisVisit then
     if UI.ahButton then UI.ahButton:Show() end
-    if FF.db.showOnAH then UI.Show() end
+  else
+    UI.Dock()
   end
 end
 
@@ -1092,6 +1092,7 @@ end)
 FF:On("AUCTION_HOUSE_CLOSED", function()
   pending = nil
   docked = false
+  blizzardThisVisit = false   -- next visit: Gold Forge again
   if AuctionHouseFrame then AuctionHouseFrame:SetAlpha(1) end
   if frame then frame:Hide() end
 end)
