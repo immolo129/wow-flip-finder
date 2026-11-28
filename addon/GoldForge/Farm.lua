@@ -293,7 +293,7 @@ function Farm.Estimate(f)
   local kph = db().kph or 140
   local total, any = 0, false
   for _, d in ipairs(f.drops or {}) do
-    if d[2] then total = total + d[2] / 100 * kph * Farm.ItemValue(d[1]); any = true end
+    if d[2] then total = total + d[2] / 100 * (d[3] or 1) * kph * Farm.ItemValue(d[1]); any = true end
   end
   return any and total or nil
 end
@@ -793,13 +793,14 @@ FF.UI.RegisterPage("farm", function(parent)
           local parts = {}
           for _, dr in ipairs(f.drops or {}) do
             local name = C_Item.GetItemNameByID(dr[1]) or ("item " .. dr[1])
-            table.insert(parts, string.format("%s %s%s", name, FF.Money(Farm.ItemValue(dr[1])), dr[2] and string.format(" (%.1f%%)", dr[2]) or ""))
+            table.insert(parts, string.format("%s %s%s", name, FF.Money(Farm.ItemValue(dr[1])),
+              dr[2] and string.format(" (%.1f%%%s)", dr[2], dr[3] and string.format(", about %d each", dr[3]) or "") or ""))
           end
           if #parts > 0 then table.insert(lines, "|cfff2b81dDrops:|r " .. table.concat(parts, ",  ")) end
           if f.mobs then table.insert(lines, "|cfff2b81dMobs:|r " .. table.concat(f.mobs, ", ") .. (f.area and ("  ·  " .. f.area) or "")) end
           if f.skill then table.insert(lines, string.format("|cfff2b81dSkinning:|r %d-%d", f.skill[1], f.skill[2])) end
           if d.live then
-            table.insert(lines, string.format("Live estimate: drop chance x %d kills/h x today's TSM price (drops with a known chance only). Your notes said %s.",
+            table.insert(lines, string.format("Live estimate: drop chance x %d kills/h x today's TSM price (drops with a known chance only; chances are Classic data from Wowhead/metabot, Forever may differ). Your notes said %s.",
               db().kph or 140, f.est and string.format("%d-%dg/h", f.est[1], f.est[2]) or "no estimate"))
           end
           if d.mine then
