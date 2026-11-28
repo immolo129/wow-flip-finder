@@ -25,11 +25,11 @@ FF.FarmData = {
     drops = { { 14047 } }, est = { 20, 20 },
     notes = "Formula: Superior Strength (item ID not confirmed). List formulas high; check the AH first." },
   { id = "silithus_scorpions", name = "Silithus scorpions", zone = "Silithus", area = "Scorpids",
-    mobs = { "Scorpid" }, drops = { { 19933 } }, cat = "Vendor", est = { 15, 22 },
-    notes = "Glowing Scorpid Blood (ID not confirmed) vendors for 20s: crash-proof, doesn't depend on the AH." },
+    mobs = { "Stonelash Pincer", "Stonelash Flayer" }, drops = { { 19933, 26 } }, cat = "Vendor", est = { 15, 22 },
+    notes = "Glowing Scorpid Blood vendors for 11s 80c in Forever (20s 80c in Classic), so the 15-22g in your notes is about 40% too high. 26% from Stonelash Pincers and Flayers (Forever loot logs)." },
   { id = "epl_bats", name = "EPL bats", zone = "Eastern Plaguelands", area = "Bats",
     mobs = { "Plaguebat", "Duskwing", "bat" }, drops = { { 11404, 28.5 } }, cat = "Vendor", est = { 15, 22 },
-    notes = "Bat eye item (name/ID not confirmed) vendors for 20s. Same role as the scorpions." },
+    notes = "Evil Bat Eye: about 28% from Monstrous Plaguebats and Duskwings. Vendor value is read from the game." },
   { id = "wpl_spiders", name = "WPL spiders", zone = "Western Plaguelands", area = "All spiders",
     mobs = { "Plague Lurker", "Spider", "Webweaver", "Crypt" }, cat = "Filler",
     drops = { { 14227, 14 } }, est = { 15, 20 } },
@@ -79,7 +79,7 @@ FF.FarmData = {
     mobs = { "Firetail Scorpid" }, cat = "Skinning", skill = { 260, 300 }, drops = { { 15408 } }, est = { 28, 37 },
     notes = "Scale price has fallen (26s -> 13s)." },
   { id = "silithus_stonelash", name = "Stonelash Scorpids", zone = "Silithus", area = "Stonelash Scorpids",
-    mobs = { "Stonelash" }, cat = "Skinning", skill = { 270, 300 }, drops = { { 15408 } },
+    mobs = { "Stonelash Scorpid" }, cat = "Skinning", skill = { 270, 300 }, drops = { { 15408 } },
     notes = "Not worth it at the current scale price." },
 
   -- ---------- dungeons, groups, weekly ----------
